@@ -5,9 +5,9 @@
 #include <algorithm>
 #include <stdlib.h>
 #include <time.h>
-#include <../libscapi/include/comm/Comm.hpp>
-#include <../libscapi/include/primitives/Prg.hpp>
-#include <../libscapi/include/primitives/Prf.hpp>
+//#include <../libscapi/include/comm/Comm.hpp>
+//#include <../libscapi/include/primitives/Prg.hpp>
+//#include <../libscapi/include/primitives/Prf.hpp>
 
 using namespace std;
 
@@ -29,7 +29,7 @@ vector<int> permute(vector<int> C) {
 
 //Compare score set with parameter t
 vector<int> compare(int S, int t) {
-	vector<int> C;
+	vector<int> C(max_s-t+1);
 
 	for(int i=0; i<=max_s-t; i++) {
 		//Multiplicatively blind the elements with random r and add to C
@@ -37,7 +37,7 @@ vector<int> compare(int S, int t) {
 		unsigned seed = chrono::system_clock::now().time_since_epoch().count();
 		srand(seed);
 		int r = rand()%10+1;
-		C.push_back(r*(S-t-i));
+		C[i] = (r*(S-t-i));
 	}
 
 	return C;
@@ -53,6 +53,8 @@ void randomkey() {
 
 }
 
+
+
 int main() {
 	int S = 7;
 
@@ -61,6 +63,7 @@ int main() {
 	for(int c : C) {
 		cout << c << endl;
 	}
+cout << endl;
 
 for(int i=0; i<5; i++) {
 		srand(chrono::system_clock::now().time_since_epoch().count());
