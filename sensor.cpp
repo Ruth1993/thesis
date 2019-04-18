@@ -59,6 +59,20 @@ void D2() {
 
 }
 
+//Check if there is a match by looking if there is a c for which c==0
+bool has_match(vector<int> C) {
+	bool result = false;
+	
+	for(int c : C) {
+		if(c == 0) {
+			//There is a match
+			result = true;
+		}
+	}
+	
+	return result;
+}
+
 int main() {
 	array<array<int, col>, k> T_u = {{{1,2,3,4}, {5,6,7,8}, {9,10,11,12}}};
 	array<int, k> vec_p = capture();

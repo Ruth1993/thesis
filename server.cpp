@@ -20,8 +20,8 @@ const int k = 3; //number of features/lookup tables
 //Comparison variables
 
 int t = 8; //threshold
-const int min_s = 0; //boundary of score domain
-const int max_s = 10; //boundary of score domain
+const int min_s = 0; //left boundary of score domain
+const int max_s = 10; //right boundary of score domain
 
 struct TableEntry {
 	int u;
@@ -68,6 +68,33 @@ int create_key() {
 	return rand()%100;
 }
 
+void add_table_entry(array<array<int, col>, k> T_u, int key)  {
+	int u = 0;
+	
+	if(!table.empty()) {
+		u = table.back().u+1;
+	}
+	
+	TableEntry entry = {u, T_u, key};
+	table.push_back(entry);
+}
+
+void add_table_entry() {
+	//int u = table.back().u+1;
+	int u = 0;
+	
+	if(!table.empty()) {
+		u = table.back().u+1;
+	}
+	
+	array<array<int, col>, k> T_u = create_T_u();
+	int key = create_key();
+	
+	TableEntry entry = {u, T_u, key};
+	
+	table.push_back(entry);
+}
+
 //Build predefined table with 3 entries
 void build_table() {
 	table.push_back({0, {{{1,2,3,4}, {5,6,7,8}, {9,1,2,3}}}, 0});
@@ -78,20 +105,33 @@ void build_table() {
 //Build table randomly given the number of entries
 void build_table(int entries) {
 	for(int i=0; i<entries; i++) {
-		//First create T_u
-		
+		add_table_entry();
 	}
 }
 
-void add_table_entry(int u, array<array<int, col>, k> T_u, int key) {
-	TableEntry entry = {u, T_u, key};
+//Print template T_u
+void print_T_u(array<array<int, col>, k> T_u) {
+	cout << "{ ";
+	
+	for(array<int, col> lu_table : T_u) {
+		cout << "{";
+		
+		for(int i=0; i<lu_table.size(); i++) {
+				cout << lu_table[i] << ",";
+		}
+		
+		cout << "} ,";
+	}
+	
+	cout << "}" << endl;
 }
 
-void add_table_entry() {
-	array<array<int, col>, k> T_u = create_T_u();
-	int key = create_key();
-	
-	
+void print_table() {
+	for(TableEntry entry : table) {
+		cout << "u: " << entry.u << "  " << "T_u: ";
+		print_T_u(entry.T_u);
+		cout << "key: " << entry.key << endl;
+	}
 }
 
 //Fetch template T_u belonging to identity claim u from database
@@ -135,13 +175,6 @@ void D1(vector<int> C) {
 
 }
 
-void randomkey() {
-
-
-}
-
-
-
 int main() {
 	int S = 7;
 
@@ -161,6 +194,11 @@ int main() {
 	cout << endl;
 	
 	array<array<int, col>, k> T_u = create_T_u();
+	int key = 0;
+	
+	build_table(5);
+
+	print_table();
 
 	return 0;
 }
