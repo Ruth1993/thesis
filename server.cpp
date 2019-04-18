@@ -1,3 +1,4 @@
+
 #include <iostream>
 #include <vector>
 #include <chrono>
@@ -17,6 +18,7 @@ const int col = 4; //size of tables in lookup table, which is 2^b in paper Joep 
 const int k = 3; //number of features/lookup tables
 
 //Comparison variables
+
 int t = 8; //threshold
 const int min_s = 0; //boundary of score domain
 const int max_s = 10; //boundary of score domain
@@ -27,26 +29,43 @@ struct TableEntry {
 	int key;
 };
 
+
 //Table
 vector<TableEntry> table;
 
 //Create random T_u
-array<array<int, col>, k> random_T_u() {
+array<array<int, col>, k> create_T_u() {
 	array<array<int, col>, k> T_u;
 
 	for(int i=0; i<k; i++) {
 		array<int, col> lu_table_u;
+		
+		//cout << "{";
 
 		for(int j=0; j<col; j++) {
 			unsigned seed = chrono::system_clock::now().time_since_epoch().count();
 			srand(seed);
 			lu_table_u[j] = rand()%max_s+min_s;
+			
+			//cout << lu_table_u[j] << ", ";
 		}
+		
+		//cout << "}" << endl;
 
 		T_u[i] = lu_table_u;
+		
 	}
-
+	
+	
 	return T_u;
+}
+
+//Create random key
+//%TODO let key be in the range of [1,|G|]
+int create_key() {
+	unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+	srand(seed);
+	return rand()%100;
 }
 
 //Build predefined table with 3 entries
@@ -64,9 +83,15 @@ void build_table(int entries) {
 	}
 }
 
-//Add lookup table to 
-void add_table(array<array<int, col>, k> lu_table) {
-	table.push_back(lu_table);
+void add_table_entry(int u, array<array<int, col>, k> T_u, int key) {
+	TableEntry entry = {u, T_u, key};
+}
+
+void add_table_entry() {
+	array<array<int, col>, k> T_u = create_T_u();
+	int key = create_key();
+	
+	
 }
 
 //Fetch template T_u belonging to identity claim u from database
@@ -134,6 +159,8 @@ int main() {
 	}
 
 	cout << endl;
+	
+	array<array<int, col>, k> T_u = create_T_u();
 
 	return 0;
 }
