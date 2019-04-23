@@ -9,16 +9,10 @@
 using namespace std;
 
 class Sensor {
-	private:
-	//%TODO make sure variables below are consistent for sensor and server
-	static int col;
-	static int k;
-	
 	public:
-	Sensor() {
-		col = 4;
-		k = 3;
-	}
+	//%TODO make sure variables below are consistent for sensor and server
+	const static int col = 4;
+	const static int k = 3;
 	
 	//Capture vec_p from biometrics
 	//Note that what captured in this function is not actually vec_p itself, but for simplicity purposes the column number which is later selected in the look_up function.
@@ -83,18 +77,18 @@ class Sensor {
 };
 
 int main() {
-	Sensor s1;
+	Sensor ss;
 	
-	array<array<int, col>, k> T_u = {{{1,2,3,4}, {5,6,7,8}, {9,10,11,12}}};
-	array<int, k> vec_p = s1.capture();
+	array<array<int, ss.col>, ss.k> T_u = {{{1,2,3,4}, {5,6,7,8}, {9,10,11,12}}};
+	array<int, ss.k> vec_p = ss.capture();
 
 	for(int p : vec_p) {
 		cout << "p: " << p << endl;
 	}
 
-	vector<int> vec_s = s1.look_up(T_u, vec_p);
+	vector<int> vec_s = ss.look_up(T_u, vec_p);
 
-	int S = s1.calc_score(vec_s);
+	int S = ss.calc_score(vec_s);
 	
 	return 0;
 }

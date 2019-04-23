@@ -2,6 +2,7 @@
 #include <iostream>
 #include <random>
 #include <array>
+#include <vector>
 
 using namespace std;
 
@@ -41,6 +42,7 @@ class Group {
 	int mult(int x, int y) {
 		return (int) (x*y)%p;
 	}
+	
 };
 
 class ElGamal {
@@ -107,7 +109,7 @@ class ElGamal {
 
 int main() {
 	int g = 2;
-	int p = 11;
+	int p = 41;
 
 	Group G;
 	G.g = 2;
