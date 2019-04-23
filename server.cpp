@@ -1,4 +1,3 @@
-
 #include <iostream>
 #include <vector>
 #include <chrono>
@@ -7,6 +6,9 @@
 #include <stdlib.h>
 #include <time.h>
 #include <array>
+
+//#include "server.h"
+//#include "elgamal.h"
 //#include <../libscapi/include/comm/Comm.hpp>
 //#include <../libscapi/include/primitives/Prg.hpp>
 //#include <../libscapi/include/primitives/Prf.hpp>
@@ -16,8 +18,8 @@ using namespace std;
 class Server {
 	public: 
 	//Variables for templates
-	const static int col = 4; //size of tables in lookup table, which is 2^b in paper Joep Peeters
-	const static int k = 3; //number of features/lookup tables
+	const int col = 4; //size of tables in lookup table, which is 2^b in paper Joep Peeters
+	const int k = 3; //number of features/lookup tables
 
 	//Comparison variables
 
@@ -27,7 +29,8 @@ class Server {
 
 	struct TableEntry {
 		int u;
-		array<array<int, col>, k> T_u;
+		//array<array<int, col>, k> T_u;
+		vector<vector<int>> T_u;
 		int key;
 	};
 
@@ -36,11 +39,38 @@ class Server {
 	vector<TableEntry> table;
 
 	//Create random T_u
-	array<array<int, col>, k> create_T_u() {
+	/*array<array<int, col>, k> create_T_u() {
 		array<array<int, col>, k> T_u;
 
 		for(int i=0; i<k; i++) {
 			array<int, col> lu_table_u;
+
+			//cout << "{";
+
+			for(int j=0; j<col; j++) {
+				unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+				srand(seed);
+				lu_table_u[j] = rand()%max_s+min_s;
+
+				//cout << lu_table_u[j] << ", ";
+			}
+
+			//cout << "}" << endl;
+
+			T_u[i] = lu_table_u;
+
+		}
+
+
+		return T_u;
+	}*/
+	
+	//Create random T_u
+	vector<vector<int>> create_T_u() {
+		vector<vector<int>> T_u(k);
+
+		for(int i=0; i<k; i++) {
+			vector<int> lu_table_u(col);
 
 			//cout << "{";
 
@@ -70,7 +100,18 @@ class Server {
 		return rand()%100;
 	}
 
-	void add_table_entry(array<array<int, col>, k> T_u, int key)  {
+	/*void add_table_entry(array<array<int, col>, k> T_u, int key)  {
+		int u = 0;
+
+		if(!table.empty()) {
+			u = table.back().u+1;
+		}
+
+		TableEntry entry = {u, T_u, key};
+		table.push_back(entry);
+	}*/
+	
+	void add_table_entry(vector<vector<int>> T_u, int key)  {
 		int u = 0;
 
 		if(!table.empty()) {
@@ -81,7 +122,7 @@ class Server {
 		table.push_back(entry);
 	}
 
-	void add_table_entry() {
+	/*void add_table_entry() {
 		//int u = table.back().u+1;
 		int u = 0;
 
@@ -90,6 +131,22 @@ class Server {
 		}
 
 		array<array<int, col>, k> T_u = create_T_u();
+		int key = create_key();
+
+		TableEntry entry = {u, T_u, key};
+
+		table.push_back(entry);
+	}*/
+	
+	void add_table_entry() {
+		//int u = table.back().u+1;
+		int u = 0;
+
+		if(!table.empty()) {
+			u = table.back().u+1;
+		}
+
+		vector<vector<int>> T_u = create_T_u();
 		int key = create_key();
 
 		TableEntry entry = {u, T_u, key};
@@ -112,10 +169,10 @@ class Server {
 	}
 
 	//Print template T_u
-	void print_T_u(array<array<int, col>, k> T_u) {
+	void print_T_u(vector<vector<int>> T_u) {
 		cout << "{ ";
 
-		for(array<int, col> lu_table : T_u) {
+		for(vector<int> lu_table : T_u) {
 			cout << "{";
 
 			for(int i=0; i<lu_table.size(); i++) {
@@ -137,15 +194,17 @@ class Server {
 	}
 
 	//Fetch template T_u belonging to identity claim u from database
-	array<array<int, col>, k> fetch_table(int u) {
+	/*array<array<int, col>, k> fetch_table(int u) {
 		array<array<int, col>, k> T_u = {{{1,2,3,4}, {5,6,7,8}, {9,10,11,12}}};
 
 		return T_u;
-	}
+	}*/
+	
+	//Fetch template T_u belonging to identity claim u from database
+	vector<vector<int>> fetch_table(int u) {
+		vector<vector<int>> T_u = {{{1,2,3,4}, {5,6,7,8}, {9,10,11,12}}};
 
-	//Set threshold t
-	void set_t(int t_new) {
-		t = t_new;
+		return T_u;
 	}
 
 	//Permute score set
@@ -198,7 +257,7 @@ int main() {
 
 	cout << endl;
 	
-	array<array<int, sv.col>, sv.k> T_u = sv.create_T_u();
+	vector<vector<int>> T_u = sv.create_T_u();
 	int key = 0;
 	
 	sv.build_table(5);

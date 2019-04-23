@@ -1,3 +1,4 @@
+#include "elgamal.h"
 #include <math.h>
 #include <iostream>
 #include <random>
@@ -46,13 +47,12 @@ class Group {
 };
 
 class ElGamal {
-	public:
-	Group G;
-	
 	private:
 	int h; //public key
 
 	public:
+	Group G;
+	
 	void print_g() {
 		cout << "g: " << G.g << endl;
 	}

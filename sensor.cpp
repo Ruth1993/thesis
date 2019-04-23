@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <vector>
+//#include "elgamal.h"
 
 using namespace std;
 
