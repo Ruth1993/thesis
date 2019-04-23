@@ -1,7 +1,7 @@
 #include <math.h>
 #include <iostream>
 #include <random>
-#include <vector>
+#include <array>
 
 using namespace std;
 
@@ -19,20 +19,27 @@ class Group {
 	}
 
 	
-	//find the multiplative inverse of a in group G
+	//find the multiplative inverse of element a in group G
 	//super simple and not very elegant solution, so please don't copy :)
-	int mult_inverse(int a) {
-	int inverse = 1;
+	int inverse(int a) {
+		int inv = 1;
 
-	for(int i=1; i<p; i++) {
-		if(((int) (i*a))%p == 1) {
-			break;
+		for(int i=1; i<p; i++) {
+			int r = ((int) (i*a));
+			if(r%p == 1) {
+				inv = i;
+				break;
+			}
 		}
+
+		cout << "Inverse of " << a << ": " << inv << endl;
+
+		return inv;	
 	}
 	
-	cout << "Inverse of " << a << ": " << inverse << endl;
-
-	return inverse;	
+	//multiply two elements x,y \in G
+	int mult(int x, int y) {
+		return (int) (x*y)%p;
 	}
 };
 
@@ -54,32 +61,47 @@ class ElGamal {
 
 	void set_h(int a) {
 		h = ((int) pow(G.g,a))%G.p;
+		//cout << "h: " << h << endl;
 	}
 
 	//encrypt message m
-	vector<int> encrypt(int m, int r) {
-		vector<int> c(2);
+	array<int, 2> encrypt(int m, int r) {
+		array<int, 2> c;
 
 		c[0] = ((int) pow(G.g,r))%G.p;
-		c[1] = ((int) (m*pow(h,r)))%G.p;
+		c[1] = G.mult(m, pow(h,r));
+		//c[1] = ((int) (m*))%G.p;
 
+		cout << "Original plaintext: " << m << endl;
 		cout << "Ciphertext: (" << c[0] << ", " << c[1] << ")" << endl;
+		cout << endl;
 
 		return c;
 	}
 
 	//decrypt ciphertext
-	int decrypt(vector<int> c, int a) {
-		//int inv_a = 
-		int m = c[1]/(pow(c[0],a));
-
+	int decrypt(array<int, 2> c, int a) {
+		int powr = (int) pow(c[0], a);
+		int m = (int) G.mult(c[1], G.inverse(pow(c[0], a)))%G.p;
+		
 		cout << "Decrypted ciphertext: " << m << endl;
+		cout << endl;
 
 		return m;
 	}
 
 	int get_h() {
 		return h;
+	}
+	
+	//multiple two ciphertexts c1 and c2
+	array<int, 2> mult(array<int, 2> c1, array<int, 2> c2) {
+		array<int, 2> result;
+		
+		result[0] = G.mult(c1[0], c2[0]);
+		result[1] = G.mult(c1[1], c2[1]);
+		
+		return result;
 	}
 };
 
@@ -97,9 +119,6 @@ int main() {
 	G.print_g();
 	G.print_p();
 
-	test.print_g();
-	test.print_p();
-
 	int a = 9;
 
 	test.set_h(a);
@@ -107,12 +126,11 @@ int main() {
 	int plaintext = 4;
 	int r = 7;
 
-	vector<int> ciphertext = test.encrypt(plaintext, r);
-	int m1 = test.decrypt(ciphertext, a);
+	array<int, 2> ciphertext = test.encrypt(plaintext, r);
+	int m = test.decrypt(ciphertext, a);
 	int m2 = test.decrypt(ciphertext, 6);
-
 	
-	G.mult_inverse(a);
+	G.inverse(6);
 
 	return 0;
 }
