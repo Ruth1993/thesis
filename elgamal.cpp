@@ -4,6 +4,8 @@
 #include <random>
 #include <array>
 #include <vector>
+#include <chrono>
+#include <time.h>
 
 using namespace std;
 
@@ -64,6 +66,20 @@ class ElGamal {
 	void set_h(int a) {
 		h = ((int) pow(G.g,a))%G.p;
 		//cout << "h: " << h << endl;
+	}
+	
+	//generate random key in G
+	int gen_key() {
+		unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+		srand(seed);
+		return rand()%G.p;
+	}
+	
+	//generate random plaintext in G
+	int gen_plaintext() {
+		unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+		srand(seed);
+		return rand()%G.p;
 	}
 
 	//encrypt message m
