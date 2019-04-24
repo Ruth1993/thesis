@@ -1,4 +1,4 @@
-#include "elgamal.h"
+//#include "elgamal.h"
 #include <math.h>
 #include <iostream>
 #include <random>
@@ -137,11 +137,13 @@ int main() {
 	G.print_g();
 	G.print_p();
 
-	int a = 9;
+	int a = test.gen_key();
+	
+	cout << "key: " << a << endl;
 
 	test.set_h(a);
 
-	int plaintext = 4;
+	int plaintext = test.gen_plaintext();
 	int r = 7;
 
 	array<int, 2> ciphertext = test.encrypt(plaintext, r);
