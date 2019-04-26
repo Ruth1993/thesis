@@ -68,6 +68,6 @@ class Server {
 	void D1(vector<int> C);
 };
 
-int main();
+int main_sv();
 							
 #endif

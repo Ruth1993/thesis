@@ -10,6 +10,8 @@ class Group {
 	int g;
 	int p;
 
+	//Group(int gg, int pp);
+
 	void print_g();
 
 	void print_p();
@@ -25,6 +27,8 @@ class ElGamal {
 
 	public:
 	Group G;
+
+	//ElGamal(Group gg);
 	
 	void print_g();
 

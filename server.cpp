@@ -8,7 +8,7 @@
 #include <array>
 
 #include "server.hpp"
-//#include "elgamal.h"
+
 //#include <../libscapi/include/comm/Comm.hpp>
 //#include <../libscapi/include/primitives/Prg.hpp>
 //#include <../libscapi/include/primitives/Prf.hpp>
@@ -92,45 +92,45 @@ void Server::build_table(int entries) {
 		}
 	}
 
-	//Print template T_u
+//Print template T_u
 void Server::print_T_u(vector<vector<int>> T_u) {
-		cout << "{ ";
+	cout << "{ ";
 
-		for(vector<int> lu_table : T_u) {
-			cout << "{";
+	for(vector<int> lu_table : T_u) {
+		cout << "{";
 
-			for(int i=0; i<lu_table.size(); i++) {
-					cout << lu_table[i] << ",";
-			}
-
-			cout << "} ,";
+		for(int i=0; i<lu_table.size(); i++) {
+				cout << lu_table[i] << ",";
 		}
 
-		cout << "}" << endl;
+		cout << "} ,";
 	}
+
+	cout << "}" << endl;
+}
 
 void Server::print_table() {
-		for(TableEntry entry : table) {
-			cout << "u: " << entry.u << "  " << "T_u: ";
-			print_T_u(entry.T_u);
-			cout << "key: " << entry.key << endl;
-		}
+	for(TableEntry entry : table) {
+		cout << "u: " << entry.u << "  " << "T_u: ";
+		print_T_u(entry.T_u);
+		cout << "key: " << entry.key << endl;
 	}
+}
 	
-	//Fetch template T_u belonging to identity claim u from database
-	//Analogous to function fetch_table() from paper
+//Fetch template T_u belonging to identity claim u from database
+//Analogous to function fetch_table() from paper
 vector<vector<int>> Server::fetch_template(int u) {
-		vector<vector<int>> T_u = {{{1,2,3,4}, {5,6,7,8}, {9,1,2,3}}};
+	vector<vector<int>> T_u = {{{0,0,0,0}, {0,0,0,0}, {0,0,0,0}}};
 		
-		for(TableEntry entry : table) {
-			if(entry.u == u) {
-				T_u = entry.T_u;
-				break;	
-			}
+	for(TableEntry entry : table) {
+		if(entry.u == u) {
+			T_u = entry.T_u;
+			break;	
 		}
-
-		return T_u;
 	}
+
+	return T_u;
+}
 
 	//Permute score set
 vector<int> Server::permute(vector<int> C) {
@@ -162,7 +162,7 @@ void Server::D1(vector<int> C) {
 	}
 
 
-int main() {
+int main_sv() {
 	Server sv;
 	
 	int S = 7;

@@ -13,7 +13,9 @@ class Sensor {
 	
 	//Capture vec_p from biometrics
 	//Note that what captured in this function is not actually vec_p itself, but for simplicity purposes the column number which is later selected in the look_up function.
-	vector<int> capture();
+	pair<int, vector<int>> capture();
+
+	pair<int, vector<int>> capture(int u);
 
 	//Lookup similarity scores in T_u by selecting columns for each p in vec_p
 	//%TODO initialise vec_s, because size is known
@@ -27,6 +29,6 @@ class Sensor {
 	bool has_match(vector<int> C);
 };
 
-int main();
+int main_ss();
 
 #endif

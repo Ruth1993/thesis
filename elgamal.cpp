@@ -10,6 +10,11 @@
 
 using namespace std;
 
+/**Group::Group(int gg, int pp) {
+	p = pp;
+	g = gg;
+}*/
+
 void Group::print_g() {
 	cout << "g: " << g << endl;
 }
@@ -42,6 +47,10 @@ int Group::mult(int x, int y) {
 		return (int) (x*y)%p;
 	}
 	
+/*ElGamal::ElGamal(Group gg) {
+	G = gg;
+}*/
+
 	void ElGamal::print_g() {
 		cout << "g: " << G.g << endl;
 	}
