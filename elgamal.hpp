@@ -26,16 +26,15 @@ class ElGamal {
 	public:
 	Group G;
 	
-	struct CipherText {
-		int c_0;
-		int c_1;
-	}
-	
 	void print_g();
 
 	void print_p();
 
 	void set_h(int a);
+
+	int gen_key();
+
+	int gen_plaintext();
 
 	//encrypt message m
 	array<int, 2> encrypt(int m, int r);
@@ -49,6 +48,6 @@ class ElGamal {
 	array<int, 2> mult(array<int, 2> c1, array<int, 2> c2);
 };
 
-int main() {;
+int main();
 
 #endif
