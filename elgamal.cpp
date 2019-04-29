@@ -5,28 +5,48 @@
 #include <vector>
 #include <chrono>
 #include <time.h>
+#include <gmp.h>
 
 #include "elgamal.hpp"
 
+//compile with g++ elgamal.cpp -lgmp
+
 using namespace std;
 
-/**Group::Group(int gg, int pp) {
-	p = pp;
-	g = gg;
-}*/
+Group::Group(mpz_t gg, mpz_t pp) {
+	mpz_set(g, gg);
+	mpz_set(p, pp);
+}
+
+Group::Group() {
+	mpz_init(g);
+	mpz_init(p);
+	mpz_set_ui(g, 2);
+	mpz_set_ui(p, 11);
+
+	print_g();
+	print_p();
+}
+
+Group::~Group() {
+	mpz_clear(g);
+	mpz_clear(p);
+}
 
 void Group::print_g() {
-	cout << "g: " << g << endl;
+	//cout << "g: " << g << endl;
+	gmp_printf("g: %Zd \n", g);
 }
 
 void Group::print_p() {
-	cout << "p: " << p << endl;
+	//cout << "p: " << p << endl;
+	gmp_printf("p: %Zd \n", p);
 }
 
-	
+
 //find the multiplative inverse of element a in group G
 //super simple and not very elegant solution, so please don't copy :)
-int Group::inverse(int a) {
+/*int Group::inverse(int a) {
 		int inv = 1;
 
 		for(int i=1; i<p; i++) {
@@ -39,104 +59,142 @@ int Group::inverse(int a) {
 
 		cout << "Inverse of " << a << ": " << inv << endl;
 
-		return inv;	
-	}
-	
+		return inv;
+	}*/
+
 //multiply two elements x,y \in G
-int Group::mult(int x, int y) {
-		return (int) (x*y)%p;
-	}
-	
-/*ElGamal::ElGamal(Group gg) {
-	G = gg;
+/*mpz_t Group::mult(mpz_t x, mpz_t y) {
+	mpz_t result;
+	mpz_init(result);
+
+	mpz_mul(result, x, y);
+
+	return result;
 }*/
 
-	void ElGamal::print_g() {
-		cout << "g: " << G.g << endl;
-	}
+ElGamal::ElGamal(Group GG): G(GG) {
+	mpz_init(h);
+}
 
-	void ElGamal::print_p() {
-		cout << "p: " << G.p << endl;
-	}
+ElGamal::ElGamal() {
+	mpz_init(h);
 
-	void ElGamal::set_h(int a) {
-		h = ((int) pow(G.g,a))%G.p;
+	mpz_set_ui(G.g, 2);
+	mpz_set_ui(G.p, 11);
+}
+
+ElGamal::~ElGamal() {
+	mpz_clear(h);
+}
+
+void ElGamal::print_g() {
+	gmp_printf("g: %Zd \n", G.g);
+}
+
+/*
+void ElGamal::print_p() {
+	cout << "p: " << G.p << endl;
+}*/
+
+/*void ElGamal::set_h(int a) {
+	h = ((int) pow(G.g,a))%G.p;
 		//cout << "h: " << h << endl;
-	}
-	
-	//generate random key in G
-	int ElGamal::gen_key() {
-		unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-		srand(seed);
-		return rand()%(G.p-1)+1;
-	}
-	
-	//generate random plaintext in G
-	int ElGamal::gen_plaintext() {
-		unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-		srand(seed);
-		return rand()%(G.p-1)+1;
-	}
+}*/
 
-	//encrypt message m
-	array<int, 2> ElGamal::encrypt(int m, int r) {
-		array<int, 2> c;
+//generate random key in G
+void ElGamal::gen_key(mpz_t key) {
+	mpz_init(key);
 
-		c[0] = ((int) pow(G.g,r))%G.p;
-		c[1] = G.mult(m, pow(h,r));
-		//c[1] = ((int) (m*))%G.p;
+	unsigned long seed;
+	gmp_randstate_t rstate;
+	gmp_randinit_mt(rstate);
+	gmp_randseed_ui(rstate, seed);
 
-		cout << "Original plaintext: " << m << endl;
-		cout << "Ciphertext: (" << c[0] << ", " << c[1] << ")" << endl;
-		cout << endl;
+	mpz_urandomm(key, rstate, G.p);
 
-		return c;
-	}
+	gmp_printf("a: %Zd \n", key);
 
-	//decrypt ciphertext
-	int ElGamal::decrypt(array<int, 2> c, int a) {
-		int powr = (int) pow(c[0], a);
-		int m = (int) G.mult(c[1], G.inverse(pow(c[0], a)))%G.p;
-		
-		cout << "Decrypted ciphertext: " << m << endl;
-		cout << endl;
+	//Also set h
+	//h = ((int) pow(G.g,a))%G.p;
+	mpz_powm(h, G.g, key, G.p);
 
-		return m;
-	}
+	gmp_printf("h: %Zd \n", h);
+}
+/*
+//generate random plaintext in G
+int ElGamal::gen_plaintext() {
+	unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+	srand(seed);
+	return rand()%(G.p-1)+1;
+}*/
 
-	int ElGamal::get_h() {
-		return h;
-	}
-	
+//encrypt message m
+/*array<mpz_t, 2> ElGamal::encrypt(mpz_t m, mpz_t r) {
+	array<mpz_t, 2> c;
+
+	c[0] = ((int) pow(G.g,r))%G.p;
+	c[1] = G.mult(m, pow(h,r));
+	//c[1] = ((int) (m*))%G.p;
+
+	cout << "Original plaintext: " << m << endl;
+	cout << "Ciphertext: (" << c[0] << ", " << c[1] << ")" << endl;
+	cout << endl;
+
+	return c;
+}
+
+/*
+//decrypt ciphertext
+int ElGamal::decrypt(array<int, 2> c, int a) {
+	int powr = (int) pow(c[0], a);
+	int m = (int) G.mult(c[1], G.inverse(pow(c[0], a)))%G.p;
+
+	cout << "Decrypted ciphertext: " << m << endl;
+	cout << endl;
+
+	return m;
+}
+
+int ElGamal::get_h() {
+	return h;
+}
+
 	//multiple two ciphertexts c1 and c2
-	array<int, 2> ElGamal::mult(array<int, 2> c1, array<int, 2> c2) {
-		array<int, 2> result;
-		
-		result[0] = G.mult(c1[0], c2[0]);
-		result[1] = G.mult(c1[1], c2[1]);
-		
-		return result;
-	}
+array<int, 2> ElGamal::mult(array<int, 2> c1, array<int, 2> c2) {
+	array<int, 2> result;
+
+	result[0] = G.mult(c1[0], c2[0]);
+	result[1] = G.mult(c1[1], c2[1]);
+
+	return result;
+}*/
 
 int main() {
-	int g = 2;
-	int p = 41;
+	mpz_t g;
+	mpz_t p;
+	mpz_init(g);
+	mpz_init(p);
+	mpz_set_ui(g, 2);
+	mpz_set_ui(p, 11);
 
-	Group G;
-	G.g = 2;
-	G.p = 11;
-	
-	ElGamal test;
-	test.G = G;
-	
-	G.print_g();
-	G.print_p();
+	//Group G;
 
-	int a = test.gen_key();
-	
+	//ElGamal test(G);
+
+	ElGamal test2;
+
+	//test.print_g();
+
+	mpz_t a;
+	mpz_init(a);
+
+	//test2.print_g();
+
+
+	test2.gen_key(a);
+
+/*
 	cout << "key: " << a << endl;
-
-	test.set_h(a);
 
 	int plaintext = test.gen_plaintext();
 	int r = 7;
@@ -144,8 +202,12 @@ int main() {
 	array<int, 2> ciphertext = test.encrypt(plaintext, r);
 	int m = test.decrypt(ciphertext, a);
 	int m2 = test.decrypt(ciphertext, 6);
-	
-	G.inverse(6);
+
+	G.inverse(6);*/
+
+	mpz_clear(g);
+	mpz_clear(p);
+	mpz_clear(a);
 
 	return 0;
 }

@@ -30,11 +30,15 @@ int main() {
 	//Step 6
 	int S = ss.calc_score(vec_s);
 
-	//Step 8
+	//Step 8 Compare S with threshold t
 	vector<int> C = sv.compare(S, t);
 
-	//Step 9
+	//Step 9 Permute
 	vector<int> C_x = sv.permute(C);
+
+	//Step 10 Deecrypt
+
+	//Step 11 Fetch key
 
 	return 0;
 }
