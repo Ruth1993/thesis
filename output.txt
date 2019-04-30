@@ -1,0 +1,9 @@
+libboost_atomic.a      libboost_serialization.a   libmiracl.a
+libboost_chrono.a      libboost_system.a          libntl.a
+libboost_date_time.a   libboost_thread.a          libOTe.a
+libboost_filesystem.a  libboost_wserialization.a  libOTExtensionBristol.a
+libboost_log.a         libcrypto.a                libsimpleot.a
+libboost_log_setup.a   libcryptoTools.a           libssl.a
+libboost_regex.a       liblibOTe_Tests.a          libtests_cryptoTools.a
+
+boost  libOTe  NTL  openssl  OTExtensionBristol
