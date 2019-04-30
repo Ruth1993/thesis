@@ -127,37 +127,41 @@ int ElGamal::gen_plaintext() {
 }*/
 
 //encrypt message m
-void ElGamal::encrypt(array<mpz_t, 2> &c, mpz_t m, mpz_t r) {
+void ElGamal::encrypt(array<mpz_t, 2> c, mpz_t m, mpz_t r) {
 	mpz_powm(c[0], G.g, r, G.p); //set c[0]
-
 	mpz_powm(c[1], h, r, G.p); //set c[1], h^r
 	mpz_mul(c[1], c[1], m); //set c[1], multiply m*h^r
 	mpz_mod(c[1], c[1], G.p); //set c[1], m*h^r mod p
 
-	gmp_printf("Encrypted message: (%Zd, %Zd) \n", c[0], c[1]);
-}
-
-
-//decrypt ciphertext
-void ElGamal::decrypt(mpz_t &m, array<mpz_t, 2> c, mpz_t a) {
-	//gmp_printf("c[0]: %Zd \n", c[0]);
-	//gmp_printf("a: %Zd \n", a);
-	mpz_powm(m, c[0], a, G.p); //c[0]^a
-	//gmp_printf("c[0]*a: %Zd \n", m);
-	mpz_invert(m, m, G.p); //(c[0]^a)^-1
-	//gmp_printf("(c[0]*a)^-1: %Zd \n", m);
-	mpz_mul(m, m, c[1]); //c[1] * (c[0]^a)^-1
-	//gmp_printf("c[1] * (c[0]*a)^-1: %Zd \n", m);
-	mpz_mod(m, m, G.p); //c[1] * (c[0]^a)^-1 mod p
-	//gmp_printf("c[1] * (c[0]*a)^-1 mod p: %Zd \n", m);
-
-	gmp_printf("Decrypted ciphertext: %Zd \n", m);
+	//c[0] = ((int) pow(G.g,r))%G.p;
+	//c[1] = G.mult(m, pow(h,r));
+	//c[1] = ((int) (m*))%G.p;
 }
 
 /*
+//decrypt ciphertext
+int ElGamal::decrypt(array<int, 2> c, int a) {
+	int powr = (int) pow(c[0], a);
+	int m = (int) G.mult(c[1], G.inverse(pow(c[0], a)))%G.p;
+
+	cout << "Decrypted ciphertext: " << m << endl;
+	cout << endl;
+
+	return m;
+}
+
 int ElGamal::get_h() {
 	return h;
 }
+
+	//multiple two ciphertexts c1 and c2
+array<int, 2> ElGamal::mult(array<int, 2> c1, array<int, 2> c2) {
+	array<int, 2> result;
+
+	result[0] = G.mult(c1[0], c2[0]);
+	result[1] = G.mult(c1[1], c2[1]);
+
+	return result;
 }*/
 
 int main() {
@@ -168,35 +172,33 @@ int main() {
 	mpz_set_ui(g, 2);
 	mpz_set_ui(p, 11);
 
+	//Group G;
+
+	//ElGamal test(G);
+
 	ElGamal test2;
 
-	//create key a
+	//test.print_g();
+
 	mpz_t a;
 	mpz_init(a);
+
+	//test2.print_g();
+
+
 	test2.gen_key(a);
 
-	//generate random r for encryption
-	mpz_t r;
-	mpz_init(r);
-	mpz_set_ui(r, 7);
-	gmp_printf("r: %Zd \n", r);
+/*
+	cout << "key: " << a << endl;
 
-	//encrypt message m
-	mpz_t m1;
-	mpz_init(m1);
-	mpz_set_ui(m1, 4);
+	int plaintext = test.gen_plaintext();
+	int r = 7;
 
-	array<mpz_t, 2> c;
-	mpz_init(c[0]);
-	mpz_init(c[1]);
+	array<int, 2> ciphertext = test.encrypt(plaintext, r);
+	int m = test.decrypt(ciphertext, a);
+	int m2 = test.decrypt(ciphertext, 6);
 
-	test2.encrypt(c, m1, r);
-
-	//decrypt ciphertext c
-	mpz_t m2;
-	mpz_init(m2);
-
-	test2.decrypt(m2, c, a);
+	G.inverse(6);*/
 
 	mpz_clear(g);
 	mpz_clear(p);

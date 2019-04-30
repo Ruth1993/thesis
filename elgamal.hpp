@@ -42,18 +42,17 @@ class ElGamal {
 
 	void print_g();
 
-	//void set_h(int a);
-
 	void gen_key(mpz_t key);
 
-	/*int gen_plaintext();
+	/*int gen_plaintext();*/
 
 	//encrypt message m
-	array<int, 2> encrypt(int m, int r);
+	void encrypt(array<mpz_t, 2> &c, mpz_t m, mpz_t r);
 
 	//decrypt ciphertext
-	int decrypt(array<int, 2> c, int a);
+	void decrypt(mpz_t &m, array<mpz_t, 2> c, mpz_t a);
 
+/*
 	int get_h();
 
 	//multiple two ciphertexts c1 and c2
