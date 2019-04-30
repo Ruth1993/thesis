@@ -43,35 +43,6 @@ void Group::print_p() {
 	gmp_printf("p: %Zd \n", p);
 }
 
-
-//find the multiplative inverse of element a in group G
-//super simple and not very elegant solution, so please don't copy :)
-/*int Group::inverse(int a) {
-		int inv = 1;
-
-		for(int i=1; i<p; i++) {
-			int r = ((int) (i*a));
-			if(r%p == 1) {
-				inv = i;
-				break;
-			}
-		}
-
-		cout << "Inverse of " << a << ": " << inv << endl;
-
-		return inv;
-	}*/
-
-//multiply two elements x,y \in G
-/*mpz_t Group::mult(mpz_t x, mpz_t y) {
-	mpz_t result;
-	mpz_init(result);
-
-	mpz_mul(result, x, y);
-
-	return result;
-}*/
-
 ElGamal::ElGamal(Group GG): G(GG) {
 	mpz_init(h);
 }
@@ -90,16 +61,6 @@ ElGamal::~ElGamal() {
 void ElGamal::print_g() {
 	gmp_printf("g: %Zd \n", G.g);
 }
-
-/*
-void ElGamal::print_p() {
-	cout << "p: " << G.p << endl;
-}*/
-
-/*void ElGamal::set_h(int a) {
-	h = ((int) pow(G.g,a))%G.p;
-		//cout << "h: " << h << endl;
-}*/
 
 //generate random key in G
 void ElGamal::gen_key(mpz_t key) {
@@ -153,12 +114,6 @@ void ElGamal::decrypt(mpz_t &m, array<mpz_t, 2> c, mpz_t a) {
 
 	gmp_printf("Decrypted ciphertext: %Zd \n", m);
 }
-
-/*
-int ElGamal::get_h() {
-	return h;
-}
-}*/
 
 int main() {
 	mpz_t g;

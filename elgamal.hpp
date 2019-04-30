@@ -21,10 +21,6 @@ class Group {
 	void print_g();
 
 	void print_p();
-
-	//int inverse(int a);
-
-	//int mult(int x, int y);
 };
 
 class ElGamal {
@@ -51,12 +47,6 @@ class ElGamal {
 
 	//decrypt ciphertext
 	void decrypt(mpz_t &m, array<mpz_t, 2> c, mpz_t a);
-
-/*
-	int get_h();
-
-	//multiple two ciphertexts c1 and c2
-	array<int, 2> mult(array<int, 2> c1, array<int, 2> c2);*/
 };
 
 int main();
