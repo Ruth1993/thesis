@@ -2,54 +2,55 @@
 #define SERVER_H
 
 #include <vector>
-//#include "elgamal.h"
-//#include <../libscapi/include/comm/Comm.hpp>
-//#include <../libscapi/include/primitives/Prg.hpp>
-//#include <../libscapi/include/primitives/Prf.hpp>
+#include <array>
+#include <gmp.h>
+#include <gmpxx.h>
 
 using namespace std;
 
 class Server {
-	public: 
-	//Variables for templates
-	const int col = 4; //size of tables in lookup table, which is 2^b in paper Joep Peeters
-	const int k = 3; //number of features/lookup tables
-
+	public:
 	//Comparison variables
 
-	int t = 8; //threshold
-	const int min_s = 0; //left boundary of score domain
-	const int max_s = 10; //right boundary of score domain
+	mpz_class t = 8; //threshold
+	mpz_class min_s = 0; //left boundary of score domain
+	mpz_class max_s = 10; //right boundary of score domain
 
 	struct TableEntry {
-		int u;
-		vector<vector<int>> T_u;
-		int key;
+		mpz_t u;
+		array<array<mpz_t, 4>, 3>  T_u;
+		mpz_t key;
 	};
 
 	//Table
 	vector<TableEntry> table;
 
-	//Create random T_u
-	vector<vector<int>> create_T_u();
+	//Create random template T_u
+	void create_temp(array<array<mpz_t, 4>, 3> &T);
 
+/*
 	//Create random key
 	//%TODO let key be in the range of [1,|G|]
 	int create_key();
-
-	void add_table_entry(vector<vector<int>> T_u, int key);
+*/
+	void add_table_entry(mpz_t u, array<array<mpz_t, 4>, 3>  T_u, mpz_t key);
 
 	void add_table_entry();
 
+	void mpz_init_T(array<array<mpz_t, 4>, 3>  &T);
+
+	void mpz_set_T(array<array<mpz_t, 4>, 3>  &T1, array<array<mpz_t, 4>, 3>  T2);
+
 	//Build predefined table with 3 entries
-	void build_table();
+	//void build_table();
 
 	//Build table randomly given the number of entries
-	void build_table(int entries);
+	//void build_table(int entries);
 
 	//Print template T_u
-	void print_T_u(vector<vector<int>> T_u);
+	//void print_temp(array<array<mpz_t, 4>, 3> T);
 
+/*
 	void print_table();
 
 	//Fetch template T_u belonging to identity claim u from database
@@ -65,9 +66,9 @@ class Server {
 	vector<int> compare(int S, int t);
 
 	//Partial decryption function
-	void D1(vector<int> C);
+	void D1(vector<int> C);*/
 };
 
-int main_sv();
-							
+int main();
+
 #endif

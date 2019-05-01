@@ -6,6 +6,7 @@
 #include <chrono>
 #include <time.h>
 #include <gmp.h>
+#include <chrono>
 
 #include "elgamal.hpp"
 
@@ -64,7 +65,7 @@ void ElGamal::print_g() {
 
 //generate random key in G
 void ElGamal::gen_key(mpz_t key) {
-	unsigned long seed;
+	unsigned long seed = chrono::system_clock::now().time_since_epoch().count();
 	gmp_randstate_t rstate;
 	gmp_randinit_mt(rstate);
 	gmp_randseed_ui(rstate, seed);
@@ -88,29 +89,29 @@ int ElGamal::gen_plaintext() {
 }*/
 
 //encrypt message m
-void ElGamal::encrypt(array<mpz_t, 2> &c, mpz_t m, mpz_t r) {
-	mpz_powm(c[0], G.g, r, G.p); //set c[0]
+void ElGamal::encrypt(Ciphertext &c, mpz_t m, mpz_t r) {
+	mpz_powm(c.c0, G.g, r, G.p); //set c.c0
 
-	mpz_powm(c[1], h, r, G.p); //set c[1], h^r
-	mpz_mul(c[1], c[1], m); //set c[1], multiply m*h^r
-	mpz_mod(c[1], c[1], G.p); //set c[1], m*h^r mod p
+	mpz_powm(c.c1, h, r, G.p); //set c.c1, h^r
+	mpz_mul(c.c1, c.c1, m); //set c.c1, multiply m*h^r
+	mpz_mod(c.c1, c.c1, G.p); //set c.c1, m*h^r mod p
 
-	gmp_printf("Encrypted message: (%Zd, %Zd) \n", c[0], c[1]);
+	gmp_printf("Encrypted message: (%Zd, %Zd) \n", c.c0, c.c1);
 }
 
 
 //decrypt ciphertext
-void ElGamal::decrypt(mpz_t &m, array<mpz_t, 2> c, mpz_t a) {
-	//gmp_printf("c[0]: %Zd \n", c[0]);
+void ElGamal::decrypt(mpz_t &m, Ciphertext c, mpz_t a) {
+	//gmp_printf("c.c0: %Zd \n", c.c0);
 	//gmp_printf("a: %Zd \n", a);
-	mpz_powm(m, c[0], a, G.p); //c[0]^a
-	//gmp_printf("c[0]*a: %Zd \n", m);
-	mpz_invert(m, m, G.p); //(c[0]^a)^-1
-	//gmp_printf("(c[0]*a)^-1: %Zd \n", m);
-	mpz_mul(m, m, c[1]); //c[1] * (c[0]^a)^-1
-	//gmp_printf("c[1] * (c[0]*a)^-1: %Zd \n", m);
-	mpz_mod(m, m, G.p); //c[1] * (c[0]^a)^-1 mod p
-	//gmp_printf("c[1] * (c[0]*a)^-1 mod p: %Zd \n", m);
+	mpz_powm(m, c.c0, a, G.p); //c.c0^a
+	//gmp_printf("c.c0*a: %Zd \n", m);
+	mpz_invert(m, m, G.p); //(c.c0^a)^-1
+	//gmp_printf("(c.c0*a)^-1: %Zd \n", m);
+	mpz_mul(m, m, c.c1); //c.c1 * (c.c0^a)^-1
+	//gmp_printf("c.c1 * (c.c0*a)^-1: %Zd \n", m);
+	mpz_mod(m, m, G.p); //c.c1 * (c.c0^a)^-1 mod p
+	//gmp_printf("c.c1 * (c.c0*a)^-1 mod p: %Zd \n", m);
 
 	gmp_printf("Decrypted ciphertext: %Zd \n", m);
 }
@@ -141,9 +142,9 @@ int main() {
 	mpz_init(m1);
 	mpz_set_ui(m1, 4);
 
-	array<mpz_t, 2> c;
-	mpz_init(c[0]);
-	mpz_init(c[1]);
+	Ciphertext c;
+	mpz_init(c.c0);
+	mpz_init(c.c1);
 
 	test2.encrypt(c, m1, r);
 
@@ -156,6 +157,10 @@ int main() {
 	mpz_clear(g);
 	mpz_clear(p);
 	mpz_clear(a);
+	mpz_clear(c.c0);
+	mpz_clear(c.c1);
+	mpz_clear(m1);
+	mpz_clear(m2);
 
 	return 0;
 }

@@ -1,193 +1,98 @@
 #include <iostream>
 #include <vector>
-#include <chrono>
-#include <random>
 #include <algorithm>
 #include <stdlib.h>
-#include <time.h>
 #include <array>
+#include <gmp.h>
+#include <gmpxx.h>
+#include <chrono>
 
 #include "server.hpp"
-
-//#include <../libscapi/include/comm/Comm.hpp>
-//#include <../libscapi/include/primitives/Prg.hpp>
-//#include <../libscapi/include/primitives/Prf.hpp>
+#include "template.hpp"
+#include "elgamal.hpp"
 
 using namespace std;
 
 //Create random T_u
-vector<vector<int>> Server::create_T_u() {
-	vector<vector<int>> T_u(k);
-	for(int i=0; i<k; i++) {
-			vector<int> lu_table_u(col);
+void Server::create_temp(array<array<mpz_t, 4>, 3> &T) {
+	for(int i=0; i<3; i++) {
+    for(int j=0; j<4; j++) {
+      mpz_init(T[i][j]);
 
-			//cout << "{";
+			unsigned long seed = chrono::system_clock::now().time_since_epoch().count();
+			gmp_randstate_t rstate;
+			gmp_randinit_mt(rstate);
+			gmp_randseed_ui(rstate, seed);
 
-			for(int j=0; j<col; j++) {
-				unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-				srand(seed);
-				lu_table_u[j] = rand()%max_s+min_s;
+			mpz_urandomm(T[i][j], rstate, max_s.get_mpz_t());
+			mpz_add(T[i][j], T[i][j], min_s.get_mpz_t());
+    }
+  }
+}
 
-				//cout << lu_table_u[j] << ", ";
-			}
-
-			//cout << "}" << endl;
-
-			T_u[i] = lu_table_u;
-
-		}
-
-
-		return T_u;
-	}
-
-	//Create random key
-	//%TODO let key be in the range of [1,|G|]
-int Server::create_key() {
-		unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-		srand(seed);
-		return rand()%100;
-	}
-	
-	//add table entry with given T_u and key
-void Server::add_table_entry(vector<vector<int>> T_u, int key)  {
-		int u = 0;
-
-		if(!table.empty()) {
-			u = table.back().u+1;
-		}
-
-		TableEntry entry = {u, T_u, key};
-		table.push_back(entry);
-	}
-	
-	//add random table entry
+//add random table entry
 void Server::add_table_entry() {
-		//int u = table.back().u+1;
-		int u = 0;
+	TableEntry entry;
 
-		if(!table.empty()) {
-			u = table.back().u+1;
-		}
+	//%TODO change u to random
+	mpz_init(entry.u);
+	mpz_set_ui(entry.u, 1);
 
-		vector<vector<int>> T_u = create_T_u();
-		int key = create_key();
+	array<array<mpz_t, 4>, 3> T;
+	create_temp(T);
+	mpz_set_T(entry.T_u, T);
 
-		TableEntry entry = {u, T_u, key};
+	//%TODO change key to ElGamal key
+	mpz_init(entry.key);
+	mpz_set_ui(entry.key, 9);
+
+	table.push_back(entry);
+}
+
+//add table entry with given T_u and key
+void Server::add_table_entry(mpz_t u, array<array<mpz_t, 4>, 3>  T_u, mpz_t key)  {
+		TableEntry entry;
+
+		mpz_init(entry.u);
+		mpz_set(entry.u, u);
+
+		mpz_init_T(T_u);
+		mpz_set_T(entry.T_u, T_u);
+
+		mpz_init(entry.key);
+		mpz_set(entry.key, key);
 
 		table.push_back(entry);
-	}
-
-	//Build predefined table with 3 entries
-void Server::build_table() {
-		table.push_back({0, {{{1,2,3,4}, {5,6,7,8}, {9,1,2,3}}}, 0});
-		table.push_back({1, {{{3,8,4,5}, {7,1,2,9}, {7,2,6,8}}}, 0});
-		table.push_back({2, {{{6,8,3,2}, {8,2,7,8}, {9,1,4,0}}}, 0});
-	}
-
-	//Build table randomly given the number of entries
-void Server::build_table(int entries) {
-		for(int i=0; i<entries; i++) {
-			add_table_entry();
-		}
-	}
-
-//Print template T_u
-void Server::print_T_u(vector<vector<int>> T_u) {
-	cout << "{ ";
-
-	for(vector<int> lu_table : T_u) {
-		cout << "{";
-
-		for(int i=0; i<lu_table.size(); i++) {
-				cout << lu_table[i] << ",";
-		}
-
-		cout << "} ,";
-	}
-
-	cout << "}" << endl;
 }
 
-void Server::print_table() {
-	for(TableEntry entry : table) {
-		cout << "u: " << entry.u << "  " << "T_u: ";
-		print_T_u(entry.T_u);
-		cout << "key: " << entry.key << endl;
-	}
-}
-	
-//Fetch template T_u belonging to identity claim u from database
-//Analogous to function fetch_table() from paper
-vector<vector<int>> Server::fetch_template(int u) {
-	vector<vector<int>> T_u = {{{0,0,0,0}, {0,0,0,0}, {0,0,0,0}}};
-		
-	for(TableEntry entry : table) {
-		if(entry.u == u) {
-			T_u = entry.T_u;
-			break;	
+void Server::mpz_init_T(array<array<mpz_t, 4>, 3>  &T) {
+	for(int i=0; i<3; i++) {
+		for(int j=0; j<4; j++) {
+			mpz_init(T[i][j]);
 		}
 	}
-
-	return T_u;
 }
 
-	//Permute score set
-vector<int> Server::permute(vector<int> C) {
-		unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-		shuffle(C.begin(), C.end(), default_random_engine(seed));
-
-		return C;
-	}
-
-	//Compare score set with parameter t
-vector<int> Server::compare(int S, int t) {
-		vector<int> C(max_s-t+1);
-
-		for(int i=0; i<=max_s-t; i++) {
-			//Multiplicatively blind the elements with random r and add to C
-			//TODO r should be in the range (1, |G|), so change number 10 to |G|
-			unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-			srand(seed);
-			int r = rand()%10+1;
-			C[i] = (r*(S-t-i));
+void Server::mpz_set_T(array<array<mpz_t, 4>, 3>  &T1, array<array<mpz_t, 4>, 3>  T2) {
+	for(int i=0; i<3; i++) {
+		for(int j=0; j<4; j++) {
+			mpz_set(T1[i][j], T2[i][i]);
 		}
-
-		return C;
 	}
+}
 
-	//Partial decryption function
-void Server::D1(vector<int> C) {
-
-	}
-
-
-int main_sv() {
+int main() {
 	Server sv;
-	
-	int S = 7;
 
-	vector<int> C = sv.compare(S, sv.t);
+	array<array<mpz_t, 4>, 3> templ;
 
-	for(int c : C) {
-		cout << c << endl;
-	}
+	sv.create_temp(templ);
 
-	cout << endl;
+	mpz_class u = 2;
+	mpz_class key = 8;
 
-	for(int i=0; i<5; i++) {
-		srand(chrono::system_clock::now().time_since_epoch().count());
-		cout << rand()%10+1 << endl;
-	}
-
-	cout << endl;
-	
-	vector<vector<int>> T_u = sv.create_T_u();
-	int key = 0;
-	
-	sv.build_table(5);
-
-	sv.print_table();
+	sv.add_table_entry(u.get_mpz_t(), templ, key.get_mpz_t());
+	//sv.print_temp(templ);
 
 	return 0;
 }

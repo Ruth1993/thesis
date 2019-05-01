@@ -23,6 +23,11 @@ class Group {
 	void print_p();
 };
 
+struct Ciphertext {
+	mpz_t c0;
+	mpz_t c1;
+};
+
 class ElGamal {
 	private:
 	mpz_t h; //public key
@@ -43,10 +48,10 @@ class ElGamal {
 	/*int gen_plaintext();*/
 
 	//encrypt message m
-	void encrypt(array<mpz_t, 2> &c, mpz_t m, mpz_t r);
+	void encrypt(Ciphertext &c, mpz_t m, mpz_t r);
 
 	//decrypt ciphertext
-	void decrypt(mpz_t &m, array<mpz_t, 2> c, mpz_t a);
+	void decrypt(mpz_t &m, Ciphertext c, mpz_t a);
 };
 
 int main();
