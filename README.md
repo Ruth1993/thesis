@@ -6,7 +6,7 @@ Install instructions:
 - Install GMP
 
 Compile:
-- g++ protocol.cpp elgamal.cpp server.cpp sensor.cpp -o protocol -gmpxx -gmp
+- g++ protocol.cpp elgamal.cpp template.cpp server.cpp sensor.cpp -o protocol -lgmpxx -lgmp
 
 Run:
 - ./protocol
