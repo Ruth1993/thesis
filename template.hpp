@@ -16,9 +16,9 @@ public:
 
   Template(mpz_class min_s, mpz_class max_s);
 
-  //Template();
+  Template();
 
   void print();
 };
 
-int main();
+int main_tp();

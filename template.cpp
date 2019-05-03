@@ -26,6 +26,14 @@ Template::Template(mpz_class min_s, mpz_class max_s) {
   }
 }
 
+Template::Template() {
+  for(int i=0; i<k; i++) {
+    for(int j=0; j<col; j++) {
+      mpz_init(T[i][j]);
+    }
+  }
+}
+
 void Template::print() {
   gmp_printf("{");
 
@@ -42,7 +50,7 @@ void Template::print() {
   gmp_printf("} \n");
 }
 
-int main() {
+int main_tp() {
   Template Tem(0,1);
   Tem.print();
 

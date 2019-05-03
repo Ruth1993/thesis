@@ -6,9 +6,22 @@
 #include <gmp.h>
 #include <gmpxx.h>
 
+#include "template.hpp"
+#include "elgamal.hpp"
+
 using namespace std;
 
 class Server {
+	private:
+	struct TableEntry {
+		mpz_t u;
+		Template  T_u;
+		mpz_t key;
+	};
+
+	//Table
+	vector<TableEntry> table;
+
 	public:
 	//Comparison variables
 
@@ -16,30 +29,18 @@ class Server {
 	mpz_class min_s = 0; //left boundary of score domain
 	mpz_class max_s = 10; //right boundary of score domain
 
-	struct TableEntry {
-		mpz_t u;
-		array<array<mpz_t, 4>, 3>  T_u;
-		mpz_t key;
-	};
-
-	//Table
-	vector<TableEntry> table;
-
-	//Create random template T_u
-	void create_temp(array<array<mpz_t, 4>, 3> &T);
-
 /*
 	//Create random key
 	//%TODO let key be in the range of [1,|G|]
 	int create_key();
 */
-	void add_table_entry(mpz_t u, array<array<mpz_t, 4>, 3>  T_u, mpz_t key);
+	//void add_table_entry(mpz_t u, Template  T_u, mpz_t key);
 
 	void add_table_entry();
 
-	void mpz_init_T(array<array<mpz_t, 4>, 3>  &T);
+	//void mpz_init_T(Template  &T);
 
-	void mpz_set_T(array<array<mpz_t, 4>, 3>  &T1, array<array<mpz_t, 4>, 3>  T2);
+	//void mpz_set_T(Template  &T1, Template  T2);
 
 	//Build predefined table with 3 entries
 	//void build_table();
@@ -50,9 +51,9 @@ class Server {
 	//Print template T_u
 	//void print_temp(array<array<mpz_t, 4>, 3> T);
 
-/*
-	void print_table();
 
+	void print_table();
+/*
 	//Fetch template T_u belonging to identity claim u from database
 	vector<vector<int>> fetch_template(int u);
 
