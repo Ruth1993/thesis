@@ -1,0 +1,5 @@
+In file included from ../libscapi/include/primitives/Dlog.hpp:31:0,
+                 from ../libscapi/include/primitives/DlogOpenSSL.hpp:34,
+                 from dlog_example.cpp:1:
+../libscapi/include/primitives/../infra/Common.hpp:33:10: fatal error: boost/random.hpp: No such file or directory
+ #include <boost/random.hpp>
