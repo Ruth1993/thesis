@@ -7,14 +7,14 @@ Install instructions:
 
 Compile:
  - Complete protocol:
-  - g++ protocol.cpp elgamal.cpp template.cpp server.cpp sensor.cpp -o protocol -lgmpxx -lgmp
+   - g++ protocol.cpp elgamal.cpp template.cpp server.cpp sensor.cpp -o protocol -lgmpxx -lgmp
 
  - If you want to try separate files that work in the current stage:
   ElGamal:
-  - g++ elgamal.cpp -o elgamal -lgmpxx -lgmp
+   - g++ elgamal.cpp -o elgamal -lgmpxx -lgmp
 
  - Server:
-  - g++ server.cpp template.cpp -lgmpxx -lgmp
+   - g++ server.cpp template.cpp -lgmpxx -lgmp
 
 Run:
 - ./protocol
