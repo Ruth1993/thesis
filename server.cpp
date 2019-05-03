@@ -88,10 +88,10 @@ int main() {
 
 	sv.create_temp(templ);
 
-	mpz_class u = 2;
-	mpz_class key = 8;
+	//mpz_class u = 2;
+	//mpz_class key = 8;
 
-	sv.add_table_entry(u.get_mpz_t(), templ, key.get_mpz_t());
+	//sv.add_table_entry(u.get_mpz_t(), templ, key.get_mpz_t());
 	//sv.print_temp(templ);
 
 	return 0;
