@@ -14,7 +14,7 @@ Compile:
    - g++ elgamal.cpp -o elgamal -lgmpxx -lgmp
 
  - Server:
-   - g++ server.cpp template.cpp -lgmpxx -lgmp
+   - g++ server.cpp template.cpp -o server -lgmpxx -lgmp
 
 Run:
 - ./protocol
