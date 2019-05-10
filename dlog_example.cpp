@@ -43,7 +43,7 @@ int main(int argc, char* argv[]){
 	//((((GroupElementPlaintext*)plaintext.get())->getElement()).get())->getElementValue()
 	//shared_ptr<GroupElement> pl = ((GroupElementPlaintext) plaintext.get()).getElement();
 
-	OpenSSLZpSafePrimeElement* element = ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)plaintext.get())->getElement()).get());
+	//OpenSSLZpSafePrimeElement* element = ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)plaintext.get())->getElement()).get());
 
 	cout << "generator value is:              " << ((OpenSSLZpSafePrimeElement *)g.get())->getElementValue() << endl;
 	cout << "exponentiate value r is:          " << r << endl;
