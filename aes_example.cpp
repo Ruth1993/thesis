@@ -36,6 +36,7 @@ int main() {
   shared_ptr<SymmetricCiphertext> cipher = encryptor.encrypt(&p1);
 
   shared_ptr<Plaintext> p2 = encryptor.decrypt(cipher.get());
+  //test
 
   cout << "Plaintext before encryption: " << byte_to_int(p1.getText()) << endl;
   cout << "Ciphertext: " << ((ByteArraySymCiphertext *)cipher.get())->toString() << endl;
