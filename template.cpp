@@ -5,54 +5,65 @@
 #include <chrono>
 
 #include "template.hpp"
-#include "elgamal.hpp"
 
 using namespace std;
 
 //Generate random template with scores between min_s and max_s
-Template::Template(mpz_class min_s, mpz_class max_s) {
+Template::Template(int bb, int kk, int min_s, int max_s) {
+  b = bb;
+  k = kk;
+
+  int col = pow(2, b);
+
   for(int i=0; i<k; i++) {
+    vector<biginteger> vec_col;
+
     for(int j=0; j<col; j++) {
-      mpz_init(T[i][j]);
+      // create a random value s_{i,j}
+      auto gen = get_seeded_prg();
+      biginteger s = getRandomInRange(min_s, max_s, gen.get());
 
-      unsigned long seed = chrono::system_clock::now().time_since_epoch().count();
-      gmp_randstate_t rstate;
-      gmp_randinit_mt(rstate);
-      gmp_randseed_ui(rstate, seed);
-
-      mpz_urandomm(T[i][j], rstate, max_s.get_mpz_t());
-      mpz_add(T[i][j], T[i][j], min_s.get_mpz_t());
+      vec_col.push_back(s);
     }
+
+    T.push_back(vec_col);
   }
 }
 
 Template::Template() {
-  for(int i=0; i<k; i++) {
-    for(int j=0; j<col; j++) {
-      mpz_init(T[i][j]);
-    }
-  }
+  Template(2, 3, 0, 10);
+}
+
+int Template::get_b() {
+  return b;
+}
+
+int Template::get_k() {
+  return k;
 }
 
 void Template::print() {
-  gmp_printf("{");
-
-  for(int i=0; i<k; i++) {
-    gmp_printf("{");
-
-    for(int j=0; j<col; j++) {
-      gmp_printf("%Zd,", T[i][j]);
+  cout << "{ ";
+  for(vector<biginteger> vec_col : T) {
+    cout << "{";
+    for(biginteger s : vec_col) {
+        cout << s << ",";
     }
 
-    gmp_printf("}");
+    cout << "}, ";
   }
 
-  gmp_printf("} \n");
+  cout << " }" << endl;
+}
+
+//Add new column to encrypted template
+void Template_enc::add_col(vector<shared_ptr<AsymmetricCiphertext>> vec_col_enc) {
+  T_enc.push_back(vec_col_enc);
 }
 
 int main_tp() {
-  Template Tem(0,1);
-  Tem.print();
+  Template T;
+  T.print();
 
   return 0;
 }

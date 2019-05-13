@@ -3,13 +3,23 @@
 
 #include <vector>
 
+#include "template.hpp"
+
+#include "../libscapi/include/mid_layer/OpenSSLSymmetricEnc.hpp"
+#include "../libscapi/include/primitives/DlogOpenSSL.hpp"
+#include "../libscapi/include/mid_layer/ElGamalEnc.hpp"
+
 using namespace std;
 
 class Sensor {
-	public:
-		//ElGamal and AES objects
+private:
+	//ElGamal and AES objects
+	shared_ptr<OpenSSLCTREncRandomIV> aes_enc;
+ 	shared_ptr<OpenSSLDlogZpSafePrime> dlog;
+	shared_ptr<ElGamalOnGroupElementEnc> elgamal;
 
-	//Sensor();
+public:
+	Sensor(shared_ptr<OpenSSLDlogZpSafePrime> dlogg);
 
 	vector<unsigned char> int_to_byte(int a);
 
@@ -17,26 +27,17 @@ class Sensor {
 
 	int byte_to_int(vector<unsigned char> vec);
 
-	void pad(vector<unsigned char> &input, int bytes) ;
+	void pad(vector<unsigned char> &input, int bytes);
+
+	void elgamal_setup();
+
+	shared_ptr<Template_enc> encrypt_template(Template T);
 
 	void enroll();
 
-	//Capture vec_p from biometrics
-	//Note that what captured in this function is not actually vec_p itself, but for simplicity purposes the column number which is later selected in the look_up function.
-	//pair<int, vector<int>> capture();
+	vector<shared_ptr<AsymmetricCiphertext>> look_up(vector<int> vec_p, shared_ptr<Template_enc> T_enc);
 
-	//pair<int, vector<int>> capture(int u);
-
-	//Lookup similarity scores in T_u by selecting columns for each p in vec_p
-	//%TODO initialise vec_s, because size is known
-	//vector<int> look_up(vector<vector<int>> T_u, vector<int> vec_p);
-
-	//int calc_score(vector<int> vec_s);
-
-	//void D2();
-
-	//Check if there is a match by looking if there is a c for which c==0
-	//bool has_match(vector<int> C);
+shared_ptr<AsymmetricCiphertext> add_scores(vector<shared_ptr<AsymmetricCiphertext>>);
 };
 
 int main();

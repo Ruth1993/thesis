@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "sensor.hpp"
+
 #include "../libscapi/include/mid_layer/OpenSSLSymmetricEnc.hpp"
 #include "../libscapi/include/primitives/DlogOpenSSL.hpp"
 #include "../libscapi/include/mid_layer/ElGamalEnc.hpp"
@@ -14,24 +15,24 @@
 
 using namespace std;
 
-/*Sensor::Sensor(auto dlogg) {
+Sensor::Sensor(shared_ptr<OpenSSLDlogZpSafePrime> dlogg) {
+	aes_enc = make_shared<OpenSSLCTREncRandomIV>("AES");
+
 	dlog = dlogg;
-}*/
+	elgamal = make_shared<ElGamalOnGroupElementEnc>(dlog);
 
-//Convert an integer to byte array of size len
-vector<unsigned char> Sensor::int_to_byte(int a, int len) {
-	vector<unsigned char> result;
-
-	for(int i=0; i<len; i++) {
-		result.push_back(a >> (8*(len-1-i)));
-	}
-
-	return result;
+	auto key_pair = elgamal->generateKey();
+	elgamal->setKey(key_pair.first, key_pair.second);
 }
 
-//Convert an integer to byte array of size 4 (standard)
 vector<unsigned char> Sensor::int_to_byte(int a) {
-  int_to_byte(a, 4);
+  vector<unsigned char> result(4);
+
+  for(int i=0; i<4; i++) {
+    result[i] = (a >> (8*(3-i)));
+  }
+
+  return result;
 }
 
 //Convert a byte array to integer
@@ -45,20 +46,50 @@ int Sensor::byte_to_int(vector<unsigned char> vec) {
   return result;
 }
 
-//Pad input with zeros (least significant bits) to match number of bytes
-void Sensor::pad(vector<unsigned char> &input, int bytes) {
-	int i = bytes-input.size()*8;
+//Pad input with zeros (least significant bits) to match number of bits
+void Sensor::pad(vector<unsigned char> &input, int bits) {
+	int i = bits-input.size()*8;
 	if(i > 0) {
 		for(int j = 0; j<i; j+=8) {
-			vector<unsigned char> byte_zeros = int_to_byte(0, 1);
+			vector<unsigned char> byte_zeros = int_to_byte(0);
 			input.push_back(byte_zeros[0]);
 		}
 	}
 }
 
+//Setup Elgamal threshold system with server
+void Sensor::elgamal_setup() {
+
+}
+
+//Encrypt template using ElGamal
+shared_ptr<Template_enc> Sensor::encrypt_template(Template T) {
+	Template_enc T_enc;
+
+	auto g = dlog->getGenerator();
+
+	for(vector<biginteger> vec_col : T.T) {
+		vector<shared_ptr<AsymmetricCiphertext>> vec_col_enc;
+
+		for(biginteger s : vec_col) {
+			//first encode s_{i,j} as g^s_{i,j}
+			auto s_prime = dlog->exponentiate(g.get(), s);
+
+			GroupElementPlaintext p(s_prime);
+			shared_ptr<AsymmetricCiphertext> cipher = elgamal->encrypt(make_shared<GroupElementPlaintext>(p));
+
+			vec_col_enc.push_back(cipher);
+		}
+
+		T_enc.add_col(vec_col_enc);
+	}
+
+	return make_shared<Template_enc>(T_enc);
+}
+
 void Sensor::enroll() {
-	auto dlog = make_shared<OpenSSLDlogZpSafePrime>(128);
-	OpenSSLCTREncRandomIV aes_enc("AES");
+	//auto dlog = make_shared<OpenSSLDlogZpSafePrime>(128);
+	//OpenSSLCTREncRandomIV aes_enc("AES");
 
 	//Step 4: pick k \in_R [0, |G|]
 	auto g = dlog->getGenerator();
@@ -78,12 +109,6 @@ void Sensor::enroll() {
 	vector<unsigned char> vec_cap_k = dlog->decodeGroupElementToByteArray(cap_k.get());
 	cout << vec_cap_k.size() << endl;
 
-	int a = 0;
-	vector<unsigned char> v_a = int_to_byte(a, 1);
-	int a2 = byte_to_int(v_a);
-
-	cout << a2 << endl;
-
 	pad(vec_cap_k, 128);
 
 	cout << vec_cap_k.size() << endl;
@@ -92,131 +117,58 @@ void Sensor::enroll() {
 	//copy_byte_vector_to_byte_array(vec_cap_k, &arr_cap_k, 0);
 	//print_byte_array(arr_cap_k, vec_cap_k.size(), "");
 	SecretKey aes_cap_k = SecretKey(vec_cap_k, "");
-	aes_enc.setKey(aes_cap_k);
+
+	aes_enc->setKey(aes_cap_k);
 
 	vector<unsigned char> vec = int_to_byte(1);
 	ByteArrayPlaintext p1(vec);
-	shared_ptr<SymmetricCiphertext> cipher = aes_enc.encrypt(&p1);
 
-	shared_ptr<Plaintext> p2 = aes_enc.decrypt(cipher.get());
-	//test
+	shared_ptr<SymmetricCiphertext> cipher = aes_enc->encrypt(&p1);
 
+	shared_ptr<Plaintext> p2 = aes_enc->decrypt(cipher.get());
+
+	cout << "Plaintext before conversion to plaintext: " << byte_to_int(vec) << endl;
 	cout << "Plaintext before encryption: " << byte_to_int(p1.getText()) << endl;
 	cout << "Ciphertext: " << ((ByteArraySymCiphertext *)cipher.get())->toString() << endl;
 	cout << "Plaintext after decryption: " << byte_to_int(((ByteArrayPlaintext *)p2.get())->getText()) << endl;
+}
 
+/*
+assert vec_p.size() == T_enc.T_enc.size()
+assert \forall p in vec_p: 0 <= p < col
+*/
+vector<shared_ptr<AsymmetricCiphertext>> Sensor::look_up(vector<int> vec_p, shared_ptr<Template_enc> T_enc) {
+	vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc;
+
+	vector<vector<shared_ptr<AsymmetricCiphertext>>> T = T_enc->T_enc;
+
+	for(int i=0; i<T.size(); i++) {
+		vector<shared_ptr<AsymmetricCiphertext>> vec_col_enc = T[i];
+		shared_ptr<AsymmetricCiphertext> s = vec_col_enc[vec_p[i]];
+
+		vec_s_enc.push_back(s);
+	}
+
+	return vec_s_enc;
+}
+
+shared_ptr<AsymmetricCiphertext> Sensor::add_scores(vector<shared_ptr<AsymmetricCiphertext>>) {
+	
 }
 
 int main() {
-	Sensor ss;
-	ss.enroll();
+	Sensor ss(make_shared<OpenSSLDlogZpSafePrime>(128));
+
+	Template T(2, 3, 0, 10);
+	T.print();
+
+	shared_ptr<Template_enc> T_enc = ss.encrypt_template(T);
+
+	vector<int> vec_p = {0, 1, 2, 3};
+
+	vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc = ss.look_up(vec_p, T_enc);
+
+	//ss.enroll();
 
 	return 0;
 }
-
-//Capture vec_p from biometrics
-//Return random u and vec_p
-//Note that what captured in this function is not actually vec_p itself, but for simplicity purposes the column number which is later selected in the look_up function.
-/*pair<int, vector<int>> Sensor::capture() {
-	int u = 0;
-	vector<int> vec_p(k);
-
-	for(int i=0; i<k; i++) {
-		unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-		srand(seed);
-		vec_p[i] = rand()%col;
-	}
-
-	unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-	srand(seed);
-	u = rand();
-
-	return make_pair(u, vec_p);
-}*/
-
-//Capture function with given identity claim u
-/*pair<int, vector<int>> Sensor::capture(int u) {
-	vector<int> vec_p(k);
-
-	for(int i=0; i<k; i++) {
-		unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-		srand(seed);
-		vec_p[i] = rand()%col;
-	}
-
-	unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-	srand(seed);
-	u = rand();
-
-	return make_pair(u, vec_p);
-}*/
-
-	//Lookup similarity scores in T_u by selecting columns for each p in vec_p
-	//%TODO initialise vec_s, because size is known
-	/*vector<int> Sensor::look_up(vector<vector<int>> T_u, vector<int> vec_p) {
-		vector<int> vec_s;
-
-		for(int i=0; i<T_u.size(); i++) {
-			vector<int> table = T_u[i];
-			int p = vec_p[i];
-			int s = table[p];
-
-			cout << "s: " << s << endl;
-
-			vec_s.push_back(s);
-		}
-
-		return vec_s;
-	}*/
-
-//Add up all s_i \in S
-/*int Sensor::calc_score(vector<int> vec_s) {
-	int S = 0;
-
-	for(int s : vec_s) {
-		S += s;
-	}
-
-	cout << "S: " << S << endl;
-
-	return S;
-}*/
-
-
-//Decryption function D2
-/*void Sensor::D2() {
-
-}*/
-
-	//Check if there is a match by looking if there is a c for which c==0
-	/*bool Sensor::has_match(vector<int> C) {
-		bool result = false;
-
-		for(int c : C) {
-			if(c == 0) {
-				//There is a match
-				result = true;
-			}
-		}
-
-		return result;
-	}*/
-
-/*int main_ss() {
-	Sensor ss;
-
-	vector<vector<int>> T_u = {{{1,2,3,4}, {5,6,7,8}, {9,10,11,12}}};
-	pair<int, vector<int>> cap = ss.capture();
-
-	vector<int> vec_p = cap.second;
-
-	for(int p : vec_p) {
-		cout << "p: " << p << endl;
-	}
-
-	vector<int> vec_s = ss.look_up(T_u, vec_p);
-
-	int S = ss.calc_score(vec_s);
-
-	return 0;
-}*/
