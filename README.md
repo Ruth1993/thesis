@@ -3,18 +3,10 @@ This is the code for my master thesis. It's still work in progress, so when you 
 
 Install instructions:
 - Download this folder
-- Install GMP
+- Install libscapi as on: https://biulibscapi.readthedocs.io/en/latest/install.html
 
 Compile:
- - Complete protocol:
-   - g++ protocol.cpp elgamal.cpp template.cpp server.cpp sensor.cpp -o protocol -lgmpxx -lgmp
-
- - If you want to try separate files that work in the current stage:
-  ElGamal:
-   - g++ elgamal.cpp -o elgamal -lgmpxx -lgmp
-
- - Server:
-   - g++ server.cpp template.cpp -o server -lgmpxx -lgmp
+ - g++ file.cpp -I/home/name -I/home/name/boost_1_64_0 -std=c++14 ../libscapi/libscapi.a -lboost_system -L/home/name/boost_1_64_0/stage/lib -lssl -lcrypto -lgmp
 
 Run:
-- ./protocol
+- ./a.out
