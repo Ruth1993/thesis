@@ -1,8 +1,5 @@
-#include <gmp.h>
-#include <gmpxx.h>
 #include <vector>
 #include <math.h>
-#include <chrono>
 
 #include "template.hpp"
 

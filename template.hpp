@@ -1,3 +1,6 @@
+#ifndef TEMPLATE_H
+#define TEMPLATE_H
+
 #include <gmp.h>
 #include <vector>
 #include <math.h>
@@ -38,3 +41,5 @@ class Template_enc {
 };
 
 int main_tp();
+
+#endif

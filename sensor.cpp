@@ -178,7 +178,7 @@ vector<shared_ptr<AsymmetricCiphertext>> Sensor::look_up(vector<int> vec_p, shar
 void Sensor::test_look_up() {
 	auto g = dlog->getGenerator();
 
-	Template T(2, 3, 0, 10);
+	Template T(3, 2, 0, 10);
 	T.print();
 
 	shared_ptr<Template_enc> T_enc = encrypt_template(T);
