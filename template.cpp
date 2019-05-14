@@ -9,7 +9,7 @@
 using namespace std;
 
 //Generate random template with scores between min_s and max_s
-Template::Template(int bb, int kk, int min_s, int max_s) {
+Template::Template(int kk, int bb, biginteger min_s, biginteger max_s) {
   b = bb;
   k = kk;
 
@@ -31,7 +31,7 @@ Template::Template(int bb, int kk, int min_s, int max_s) {
 }
 
 Template::Template() {
-  Template(2, 3, 0, 10);
+  Template(3, 2, 0, 10);
 }
 
 int Template::get_b() {
@@ -40,6 +40,11 @@ int Template::get_b() {
 
 int Template::get_k() {
   return k;
+}
+
+//Get element on position x,y
+biginteger Template::get(int i, int j) {
+  return T[i][j];
 }
 
 void Template::print() {

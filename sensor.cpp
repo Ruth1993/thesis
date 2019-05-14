@@ -8,10 +8,11 @@
 
 #include "sensor.hpp"
 
+/*
 #include "../libscapi/include/mid_layer/OpenSSLSymmetricEnc.hpp"
 #include "../libscapi/include/primitives/DlogOpenSSL.hpp"
 #include "../libscapi/include/mid_layer/ElGamalEnc.hpp"
-#include "../libscapi/include/infra/Common.hpp"
+#include "../libscapi/include/infra/Common.hpp"*/
 
 using namespace std;
 
@@ -133,6 +134,28 @@ void Sensor::enroll() {
 	cout << "Plaintext after decryption: " << byte_to_int(((ByteArrayPlaintext *)p2.get())->getText()) << endl;
 }
 
+//Captures vec_p with identity claim u
+pair<int, vector<int>> Sensor::capture(int k, int b) {
+	unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+	srand(seed);
+	int u = rand();
+
+	cout << "u: " << u << endl;
+
+	vector<int> vec_p;
+
+	int len = pow(2, b);
+
+	for(int i=0; i<len; i++) {
+		unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+		srand(seed);
+		vec_p.push_back(rand()%len);
+		cout << vec_p[i] << endl;
+	}
+
+	return make_pair(u, vec_p);
+}
+
 /*
 assert vec_p.size() == T_enc.T_enc.size()
 assert \forall p in vec_p: 0 <= p < col
@@ -152,21 +175,80 @@ vector<shared_ptr<AsymmetricCiphertext>> Sensor::look_up(vector<int> vec_p, shar
 	return vec_s_enc;
 }
 
-shared_ptr<AsymmetricCiphertext> Sensor::add_scores(vector<shared_ptr<AsymmetricCiphertext>>) {
-	
+void Sensor::test_look_up() {
+	auto g = dlog->getGenerator();
+
+	Template T(2, 3, 0, 10);
+	T.print();
+
+	shared_ptr<Template_enc> T_enc = encrypt_template(T);
+
+	vector<int> vec_p = {0, 1, 2};
+
+	vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc = look_up(vec_p, T_enc);
+
+	for(int i=0; i<vec_s_enc.size(); i++) {
+		shared_ptr<AsymmetricCiphertext> s_enc = vec_s_enc[i];
+		shared_ptr<Plaintext> g_s = elgamal->decrypt(s_enc.get());
+		biginteger s = T.get(i, vec_p[i]);
+		auto g_s2 = dlog->exponentiate(g.get(), s);
+
+		cout << "s: " << s << endl;
+		cout << "g^s: " << ((OpenSSLZpSafePrimeElement *)g_s2.get())->getElementValue() << endl;
+		cout << "Decrypted selected scores: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)g_s.get())->getElement()).get())->getElementValue() << endl;
+	}
+}
+
+//Add up all scores contained in vec_s_enc
+shared_ptr<AsymmetricCiphertext> Sensor::add_scores(vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc) {
+	//%TODO add 0 for randomization
+	shared_ptr<AsymmetricCiphertext> result = vec_s_enc[0];
+
+	for(int i=1; i<vec_s_enc.size(); i++) {
+		result = elgamal->multiply(result.get(), vec_s_enc[i].get());
+	}
+
+	return result;
+}
+
+void Sensor::test_add_scores() {
+	auto g = dlog->getGenerator();
+	vector<biginteger> ints;
+	vector<shared_ptr<AsymmetricCiphertext>> ciphers;
+	biginteger total = 0;
+
+	for(int i=0; i<4; i++) {
+		auto gen = get_seeded_prg();
+		ints.push_back(getRandomInRange(0, 5, gen.get()));
+
+		auto gi = dlog->exponentiate(g.get(), ints[i]);
+
+		GroupElementPlaintext p(gi);
+		shared_ptr<AsymmetricCiphertext> cipher = elgamal->encrypt(make_shared<GroupElementPlaintext>(p));
+
+		ciphers.push_back(cipher);
+
+		total += ints[i];
+
+		cout << ints[i] << endl;
+	}
+
+	auto g_total = dlog->exponentiate(g.get(), total);
+
+	shared_ptr<AsymmetricCiphertext> total_score = add_scores(ciphers);
+	shared_ptr<Plaintext> plaintext = elgamal->decrypt(total_score.get());
+
+	cout << "total: " << total << endl;
+	cout << "g^total: " << ((OpenSSLZpSafePrimeElement *)g_total.get())->getElementValue() << endl;
+	cout << "decrypted total score: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)plaintext.get())->getElement()).get())->getElementValue() << endl;
 }
 
 int main() {
 	Sensor ss(make_shared<OpenSSLDlogZpSafePrime>(128));
 
-	Template T(2, 3, 0, 10);
-	T.print();
+	ss.capture(3, 2);
 
-	shared_ptr<Template_enc> T_enc = ss.encrypt_template(T);
-
-	vector<int> vec_p = {0, 1, 2, 3};
-
-	vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc = ss.look_up(vec_p, T_enc);
+	//ss.test_look_up();
 
 	//ss.enroll();
 

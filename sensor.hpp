@@ -35,9 +35,15 @@ public:
 
 	void enroll();
 
+	pair<int, vector<int>> capture(int k, int b);
+
 	vector<shared_ptr<AsymmetricCiphertext>> look_up(vector<int> vec_p, shared_ptr<Template_enc> T_enc);
 
-shared_ptr<AsymmetricCiphertext> add_scores(vector<shared_ptr<AsymmetricCiphertext>>);
+	void test_look_up();
+
+	shared_ptr<AsymmetricCiphertext> add_scores(vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc);
+
+	void test_add_scores();
 };
 
 int main();
