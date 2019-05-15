@@ -40,6 +40,8 @@ public:
 
 	vector<shared_ptr<AsymmetricCiphertext>> look_up(vector<int> vec_p, shared_ptr<Template_enc> T_enc);
 
+	shared_ptr<GroupElement> check_key(vector<shared_ptr<GroupElement>> vec_B, shared_ptr<SymmetricCiphertext> aes_K);
+
 	void test_look_up();
 
 	shared_ptr<AsymmetricCiphertext> add_scores(vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc);
@@ -47,6 +49,6 @@ public:
 	void test_add_scores();
 };
 
-int main();
+int main_ss();
 
 #endif

@@ -3,8 +3,8 @@
 
 using namespace std;
 
-shared_ptr<AsymmetricCiphertext> Table::get_T_enc(int u) {
-  shared_ptr<AsymmetricCiphertext> T_enc;
+shared_ptr<Template_enc> Table::get_T_enc(int u) {
+  shared_ptr<Template_enc> T_enc;
 
   for(Table_Entry entry : table) {
     if(entry.u == u) {
@@ -27,7 +27,7 @@ pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> Table::g
   return key_pair;
 }
 
-void Table::add_entry(int u, shared_ptr<AsymmetricCiphertext> T_enc, shared_ptr<AsymmetricCiphertext> K_enc, shared_ptr<SymmetricCiphertext> K_aes) {
+void Table::add_entry(int u, shared_ptr<Template_enc> T_enc, shared_ptr<AsymmetricCiphertext> K_enc, shared_ptr<SymmetricCiphertext> K_aes) {
   Table_Entry entry = {u, T_enc, K_enc, K_aes};
   table.push_back(entry);
 }
@@ -47,4 +47,8 @@ void Table::remove_entry(int u) {
       table.erase(table.begin()+i);
     }
   }
+}
+
+int Table::size() {
+  return table.size();
 }

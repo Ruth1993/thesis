@@ -38,13 +38,6 @@ int main(int argc, char* argv[]){
   shared_ptr<AsymmetricCiphertext> cipher = elGamal1.encrypt(make_shared<GroupElementPlaintext>(p1));
 	shared_ptr<Plaintext> plaintext = elGamal2.decrypt(cipher.get());
 
-	//GroupElement plaintext_ge = ((((GroupElementPlaintext*)plaintext.get())->getElement()).get());
-	//(((GroupElementPlaintext*)plaintext.get())->getElement())).get()
-	//((((GroupElementPlaintext*)plaintext.get())->getElement()).get())->getElementValue()
-	//shared_ptr<GroupElement> pl = ((GroupElementPlaintext) plaintext.get()).getElement();
-
-	//OpenSSLZpSafePrimeElement* element = ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)plaintext.get())->getElement()).get());
-
 	cout << "generator value is:              " << ((OpenSSLZpSafePrimeElement *)g.get())->getElementValue() << endl;
 	cout << "exponentiate value r is:          " << r << endl;
 	cout << "exponentiation result is:       " << ((OpenSSLZpSafePrimeElement *)g1.get())->getElementValue() << endl;

@@ -20,11 +20,11 @@ Server::Server(shared_ptr<OpenSSLDlogZpSafePrime> dlogg) {
 }
 
 //add random table entry
-void Server::store_table(int u, shared_ptr<AsymmetricCiphertext> T_enc, shared_ptr<AsymmetricCiphertext> K_enc, shared_ptr<SymmetricCiphertext> K_aes) {
-	table.add_entry(u, T_enc, K_enc, K_aes);
+void Server::store_table(int u, shared_ptr<Template_enc> T_enc, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> key_pair) {
+	table.add_entry(u, T_enc, key_pair.first, key_pair.second);
 }
 
-shared_ptr<Template_enc> Server::fetch_template() {
+shared_ptr<Template_enc> Server::fetch_template(int u) {
 	table.get_T_enc(u);
 }
 
@@ -70,6 +70,18 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::permute(vector<shared_ptr<Asymm
 	return vec_cap_c_enc;
 }
 
+vector<shared_ptr<AsymmetricCiphertext>> Server::potential_keys(vector<shared_ptr<AsymmetricCiphertext>> vec_cap_c_enc2, shared_ptr<AsymmetricCiphertext> cap_k_enc2) {
+	vector<shared_ptr<AsymmetricCiphertext>> cap_b_enc2;
+
+	for(shared_ptr<AsymmetricCiphertext> cap_c_i_enc2 : vec_cap_c_enc2) {
+		shared_ptr<AsymmetricCiphertext> cap_b_i_enc2 = elgamal->multiply(cap_c_i_enc2.get(), cap_k_enc2.get());
+		cap_b_enc2.push_back(cap_b_i_enc2);
+	}
+
+	return cap_b_enc2;
+}
+
+//Compare S with threshold t
 void Server::test_compare(biginteger t, biginteger max_s) {
 	auto g = dlog->getGenerator();
 
@@ -97,6 +109,7 @@ void Server::test_compare(biginteger t, biginteger max_s) {
 	}
 }
 
+//Permute order of comparison vector
 void Server::test_permute(biginteger cap_s, biginteger t, biginteger max_s) {
 	auto g = dlog->getGenerator();
 
@@ -120,13 +133,6 @@ void Server::test_permute(biginteger cap_s, biginteger t, biginteger max_s) {
 	for(shared_ptr<AsymmetricCiphertext> cap_c_i_enc_prime : vec_cap_c_enc_prime) {
 		shared_ptr<Plaintext> cap_c_i_prime = elgamal->decrypt(cap_c_i_enc_prime.get());
 		cout << "C_i': " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)cap_c_i_prime.get())->getElement()).get())->getElementValue() << endl;
-	}
-}
-
-void Server::test_table(int entries) {
-	for(int i=0; i<entries; i++) {
-		int u = i;
-
 	}
 }
 
