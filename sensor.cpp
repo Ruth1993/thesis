@@ -200,6 +200,7 @@ shared_ptr<GroupElement> Sensor::check_key(vector<shared_ptr<GroupElement>> vec_
 		biginteger decryption_int = byte_to_int(((ByteArrayPlaintext *)decryption.get())->getText());
 
 		cout << "decryption_int: " << decryption_int << endl;
+		cout << "B_i: " ((OpenSSLZpSafePrimeElement *)B_i.get())->getElementValue() << endl;
 
 		if(decryption_int == 1) {
 			B_i = B_i;

@@ -70,6 +70,10 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::permute(vector<shared_ptr<Asymm
 	return vec_cap_c_enc;
 }
 
+pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> Server::fetch_key_pair(int u) {
+	table.get_key_pair(u);
+}
+
 vector<shared_ptr<AsymmetricCiphertext>> Server::potential_keys(vector<shared_ptr<AsymmetricCiphertext>> vec_cap_c_enc2, shared_ptr<AsymmetricCiphertext> cap_k_enc2) {
 	vector<shared_ptr<AsymmetricCiphertext>> cap_b_enc2;
 
