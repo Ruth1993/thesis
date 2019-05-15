@@ -6,9 +6,9 @@
 using namespace std;
 
 //Generate random template with scores between min_s and max_s
-Template::Template(int kk, int bb, biginteger min_s, biginteger max_s) {
-  b = bb;
-  k = kk;
+Template::Template(pair<int, int> size, biginteger min_s, biginteger max_s) {
+  b = size.first;
+  k = size.second;
 
   int col = pow(2, b);
 
@@ -28,7 +28,7 @@ Template::Template(int kk, int bb, biginteger min_s, biginteger max_s) {
 }
 
 Template::Template() {
-  Template(3, 2, 0, 10);
+  Template(make_pair(3, 2), 0, 10);
 }
 
 int Template::get_b() {

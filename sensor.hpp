@@ -2,6 +2,7 @@
 #define SENSOR_H
 
 #include <vector>
+#include <tuple>
 
 #include "template.hpp"
 
@@ -31,11 +32,11 @@ public:
 
 	void elgamal_setup();
 
+	pair<int, vector<int>> capture(pair<int, int> template_size);
+
 	shared_ptr<Template_enc> encrypt_template(Template T);
 
-	void enroll();
-
-	pair<int, vector<int>> capture(int k, int b);
+	tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enroll(pair<int, int> template_size);
 
 	vector<shared_ptr<AsymmetricCiphertext>> look_up(vector<int> vec_p, shared_ptr<Template_enc> T_enc);
 

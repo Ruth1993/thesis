@@ -63,6 +63,28 @@ void Sensor::elgamal_setup() {
 
 }
 
+//Captures vec_p with identity claim u
+pair<int, vector<int>> Sensor::capture(pair<int, int> template_size) {
+	unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+	srand(seed);
+	int u = rand();
+
+	cout << "u: " << u << endl;
+
+	vector<int> vec_p;
+
+	int len = pow(2, template_size.second);
+
+	for(int i=0; i<len; i++) {
+		unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+		srand(seed);
+		vec_p.push_back(rand()%len);
+		cout << vec_p[i] << endl;
+	}
+
+	return make_pair(u, vec_p);
+}
+
 //Encrypt template using ElGamal
 shared_ptr<Template_enc> Sensor::encrypt_template(Template T) {
 	Template_enc T_enc;
@@ -88,9 +110,15 @@ shared_ptr<Template_enc> Sensor::encrypt_template(Template T) {
 	return make_shared<Template_enc>(T_enc);
 }
 
-void Sensor::enroll() {
-	//auto dlog = make_shared<OpenSSLDlogZpSafePrime>(128);
-	//OpenSSLCTREncRandomIV aes_enc("AES");
+tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> Sensor::enroll(pair<int, int> template_size) {
+	//Step 1
+	pair<int, vector<int>> u_vec_p = capture(template_size);
+
+	//Step 2 Construct Template_enc
+	Template T;
+
+	//Step 3 Encrypte template T
+	shared_ptr<Template_enc> T_enc = encrypt_template(T);
 
 	//Step 4: pick k \in_R [0, |G|]
 	auto g = dlog->getGenerator();
@@ -103,7 +131,10 @@ void Sensor::enroll() {
 	auto cap_k = dlog->exponentiate(g.get(), k);
 
 
+
 	//Step 5: encrypt K
+	GroupElementPlaintext p_cap_k(cap_k);
+	shared_ptr<AsymmetricCiphertext> cap_k_enc = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_cap_k));
 
 	//Step 6: AES_K(1)
 	//First copy cap_k to byte vector in order to use in AES encryption
@@ -117,43 +148,23 @@ void Sensor::enroll() {
 	//byte arr_cap_k[15];
 	//copy_byte_vector_to_byte_array(vec_cap_k, &arr_cap_k, 0);
 	//print_byte_array(arr_cap_k, vec_cap_k.size(), "");
-	SecretKey aes_cap_k = SecretKey(vec_cap_k, "");
+	SecretKey aes_cap_k_sk = SecretKey(vec_cap_k, "");
 
-	aes_enc->setKey(aes_cap_k);
+	aes_enc->setKey(aes_cap_k_sk);
 
 	vector<unsigned char> vec = int_to_byte(1);
 	ByteArrayPlaintext p1(vec);
 
-	shared_ptr<SymmetricCiphertext> cipher = aes_enc->encrypt(&p1);
+	shared_ptr<SymmetricCiphertext> aes_cap_k = aes_enc->encrypt(&p1);
 
-	shared_ptr<Plaintext> p2 = aes_enc->decrypt(cipher.get());
+	/*shared_ptr<Plaintext> p2 = aes_enc->decrypt(cipher.get());
 
 	cout << "Plaintext before conversion to plaintext: " << byte_to_int(vec) << endl;
 	cout << "Plaintext before encryption: " << byte_to_int(p1.getText()) << endl;
 	cout << "Ciphertext: " << ((ByteArraySymCiphertext *)cipher.get())->toString() << endl;
-	cout << "Plaintext after decryption: " << byte_to_int(((ByteArrayPlaintext *)p2.get())->getText()) << endl;
-}
+	cout << "Plaintext after decryption: " << byte_to_int(((ByteArrayPlaintext *)p2.get())->getText()) << endl;*/
 
-//Captures vec_p with identity claim u
-pair<int, vector<int>> Sensor::capture(int k, int b) {
-	unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-	srand(seed);
-	int u = rand();
-
-	cout << "u: " << u << endl;
-
-	vector<int> vec_p;
-
-	int len = pow(2, b);
-
-	for(int i=0; i<len; i++) {
-		unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-		srand(seed);
-		vec_p.push_back(rand()%len);
-		cout << vec_p[i] << endl;
-	}
-
-	return make_pair(u, vec_p);
+	return make_tuple(u_vec_p.first, T_enc, make_pair(cap_k_enc, aes_cap_k));
 }
 
 /*
@@ -178,7 +189,7 @@ vector<shared_ptr<AsymmetricCiphertext>> Sensor::look_up(vector<int> vec_p, shar
 void Sensor::test_look_up() {
 	auto g = dlog->getGenerator();
 
-	Template T(3, 2, 0, 10);
+	Template T;
 	T.print();
 
 	shared_ptr<Template_enc> T_enc = encrypt_template(T);
@@ -246,7 +257,7 @@ void Sensor::test_add_scores() {
 int main() {
 	Sensor ss(make_shared<OpenSSLDlogZpSafePrime>(128));
 
-	ss.capture(3, 2);
+	ss.capture(make_pair(3, 2));
 
 	//ss.test_look_up();
 

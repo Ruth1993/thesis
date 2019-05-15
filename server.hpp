@@ -20,12 +20,15 @@ private:
  	shared_ptr<OpenSSLDlogZpSafePrime> dlog;
 	shared_ptr<ElGamalOnGroupElementEnc> elgamal;
 
+	//Table
+	Table table;
+
 public:
 	Server(shared_ptr<OpenSSLDlogZpSafePrime> dlogg);
 
 	void store_table();
 
-	shared_ptr<Template_enc> fetch_table();
+	shared_ptr<Template_enc> fetch_template(int u);
 
 	vector<shared_ptr<AsymmetricCiphertext>> compare(shared_ptr<AsymmetricCiphertext> cap_s_enc, biginteger t, biginteger max_s);
 

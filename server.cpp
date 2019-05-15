@@ -20,12 +20,12 @@ Server::Server(shared_ptr<OpenSSLDlogZpSafePrime> dlogg) {
 }
 
 //add random table entry
-void Server::store_table() {
-
+void Server::store_table(int u, shared_ptr<AsymmetricCiphertext> T_enc, shared_ptr<AsymmetricCiphertext> K_enc, shared_ptr<SymmetricCiphertext> K_aes) {
+	table.add_entry(u, T_enc, K_enc, K_aes);
 }
 
-shared_ptr<Template_enc> Server::fetch_table() {
-
+shared_ptr<Template_enc> Server::fetch_template() {
+	table.get_T_enc(u);
 }
 
 vector<shared_ptr<AsymmetricCiphertext>> Server::compare(shared_ptr<AsymmetricCiphertext> cap_s_enc, biginteger t, biginteger max_s) {
@@ -120,6 +120,13 @@ void Server::test_permute(biginteger cap_s, biginteger t, biginteger max_s) {
 	for(shared_ptr<AsymmetricCiphertext> cap_c_i_enc_prime : vec_cap_c_enc_prime) {
 		shared_ptr<Plaintext> cap_c_i_prime = elgamal->decrypt(cap_c_i_enc_prime.get());
 		cout << "C_i': " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)cap_c_i_prime.get())->getElement()).get())->getElementValue() << endl;
+	}
+}
+
+void Server::test_table(int entries) {
+	for(int i=0; i<entries; i++) {
+		int u = i;
+
 	}
 }
 

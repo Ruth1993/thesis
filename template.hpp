@@ -18,7 +18,7 @@ private:
 public:
   vector<vector<biginteger>> T;
 
-  Template(int kk, int bb, biginteger min_s, biginteger max_s);
+  Template(pair<int, int> size, biginteger min_s, biginteger max_s);
 
   Template();
 
