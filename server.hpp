@@ -46,6 +46,6 @@ public:
 	void test_potential_keys();
 };
 
-int main();
+int main_sv();
 
 #endif

@@ -200,7 +200,7 @@ shared_ptr<GroupElement> Sensor::check_key(vector<shared_ptr<GroupElement>> vec_
 		biginteger decryption_int = byte_to_int(((ByteArrayPlaintext *)decryption.get())->getText());
 
 		cout << "decryption_int: " << decryption_int << endl;
-		cout << "B_i: " ((OpenSSLZpSafePrimeElement *)B_i.get())->getElementValue() << endl;
+		cout << "B_i: " << ((OpenSSLZpSafePrimeElement *)B_i.get())->getElementValue() << endl;
 
 		if(decryption_int == 1) {
 			B_i = B_i;
@@ -209,6 +209,30 @@ shared_ptr<GroupElement> Sensor::check_key(vector<shared_ptr<GroupElement>> vec_
 	}
 
 	return B_i;
+}
+
+//Add up all scores contained in vec_s_enc
+shared_ptr<AsymmetricCiphertext> Sensor::add_scores(vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc) {
+	//%TODO add 0 for randomization
+	shared_ptr<AsymmetricCiphertext> result = vec_s_enc[0];
+
+	for(int i=1; i<vec_s_enc.size(); i++) {
+		result = elgamal->multiply(result.get(), vec_s_enc[i].get());
+	}
+
+	return result;
+}
+
+vector<shared_ptr<GroupElement>> Sensor::decrypt_vec_B_enc(vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc) {
+	vector<shared_ptr<GroupElement>> vec_B;
+
+	for(shared_ptr<AsymmetricCiphertext> B_i_enc : vec_B_enc) {
+		shared_ptr<Plaintext> plaintext = elgamal->decrypt(B_i_enc.get());
+		shared_ptr<GroupElement> B_i = ((GroupElementPlaintext*)plaintext.get())->getElement();
+		vec_B.push_back(B_i);
+	}
+
+	return vec_B;
 }
 
 void Sensor::test_look_up() {
@@ -233,18 +257,6 @@ void Sensor::test_look_up() {
 		cout << "g^s: " << ((OpenSSLZpSafePrimeElement *)g_s2.get())->getElementValue() << endl;
 		cout << "Decrypted selected scores: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)g_s.get())->getElement()).get())->getElementValue() << endl;
 	}
-}
-
-//Add up all scores contained in vec_s_enc
-shared_ptr<AsymmetricCiphertext> Sensor::add_scores(vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc) {
-	//%TODO add 0 for randomization
-	shared_ptr<AsymmetricCiphertext> result = vec_s_enc[0];
-
-	for(int i=1; i<vec_s_enc.size(); i++) {
-		result = elgamal->multiply(result.get(), vec_s_enc[i].get());
-	}
-
-	return result;
 }
 
 void Sensor::test_add_scores() {

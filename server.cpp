@@ -140,7 +140,7 @@ void Server::test_permute(biginteger cap_s, biginteger t, biginteger max_s) {
 	}
 }
 
-int main() {
+int main_sv() {
 	Server sv(make_shared<OpenSSLDlogZpSafePrime>(128));
 
 	sv.test_permute(5, 3, 10);
