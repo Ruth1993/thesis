@@ -45,7 +45,7 @@ biginteger Template::get(int i, int j) {
 }
 
 void Template::print() {
-  cout << "{ ";
+  cout << "Template: { ";
   for(vector<biginteger> vec_col : T) {
     cout << "{";
     for(biginteger s : vec_col) {

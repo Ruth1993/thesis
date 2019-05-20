@@ -71,12 +71,16 @@ pair<int, vector<int>> Sensor::capture(int u, pair<int, int> template_size) {
 
 	int len = pow(2, template_size.second);
 
-	for(int i=0; i<len; i++) {
+	cout << "vec(p): ";
+
+	for(int i=0; i<template_size.first; i++) {
 		unsigned seed = chrono::system_clock::now().time_since_epoch().count();
 		srand(seed);
 		vec_p.push_back(rand()%len);
-		cout << vec_p[i] << endl;
+		cout << vec_p[i] << ", ";
 	}
+
+	cout << endl;
 
 	return make_pair(u, vec_p);
 }
@@ -113,7 +117,7 @@ shared_ptr<Template_enc> Sensor::encrypt_template(Template T) {
 		T_enc.add_col(vec_col_enc);
 	}
 
-	cout << "succesfully encrypted template" << endl;
+	//cout << "succesfully encrypted template" << endl;
 
 	return make_shared<Template_enc>(T_enc);
 }
@@ -121,10 +125,12 @@ shared_ptr<Template_enc> Sensor::encrypt_template(Template T) {
 tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> Sensor::enroll(int u, pair<int, int> template_size, int min_s, int max_s) {
 	//Step 1
 	pair<int, vector<int>> u_vec_p = capture(u, template_size);
+	//pair<int, vector<int>> u_vec_p = make_pair(1, {0, 0, 0});
 	cout << "enrolled with u: " << u << endl;
 
 	//Step 2 Construct Template_enc
 	Template T(template_size, min_s, max_s);
+	T.print();
 
 	//Step 3 Encrypte template T
 	shared_ptr<Template_enc> T_enc = encrypt_template(T);
@@ -243,6 +249,7 @@ vector<shared_ptr<GroupElement>> Sensor::decrypt_vec_B_enc(vector<shared_ptr<Asy
 		shared_ptr<Plaintext> plaintext = elgamal->decrypt(B_i_enc.get());
 		shared_ptr<GroupElement> B_i = ((GroupElementPlaintext*)plaintext.get())->getElement();
 		vec_B.push_back(B_i);
+		cout << "C_i: " << ((OpenSSLZpSafePrimeElement *)B_i.get())->getElementValue() << endl;
 	}
 
 	return vec_B;

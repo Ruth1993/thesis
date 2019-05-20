@@ -6,7 +6,6 @@
 
 #include "template.hpp"
 #include "table.hpp"
-#include "elgamal.hpp"
 
 #include "../libscapi/include/mid_layer/OpenSSLSymmetricEnc.hpp"
 #include "../libscapi/include/primitives/DlogOpenSSL.hpp"

@@ -11,7 +11,7 @@ int main() {
 	pair<int, int> template_size = make_pair(3,2);
 	int min_s = 0;
 	int max_s = 10;
-	int t = 1;
+	int t = 5;
 
 	Sensor ss(dlog);
 	Server sv(dlog);
@@ -39,15 +39,15 @@ int main() {
 	cout << "after fetch keys" << endl;
 
 	cout << "Size of [C']: " << vec_C_enc_prime.size() << endl;
-	vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc2 = sv.potential_keys(vec_C_enc_prime, key_pair.first);
-	cout << " after potential keys" << endl;
+	/*vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc2 = sv.potential_keys(vec_C_enc_prime, key_pair.first);
+	cout << " after potential keys" << endl;*/
 
-	vector<shared_ptr<GroupElement>> vec_B = ss.decrypt_vec_B_enc(vec_B_enc2);
+	vector<shared_ptr<GroupElement>> vec_B = ss.decrypt_vec_B_enc(vec_C_enc_prime);
 	cout << "after decrypt vec_B_enc" << endl;
-	shared_ptr<GroupElement> key = ss.check_key(vec_B, key_pair.second);
-	cout << "after check key" << endl;
+	//shared_ptr<GroupElement> key = ss.check_key(vec_B, key_pair.second);
+	//cout << "after check key" << endl;
 
-	cout << "Key: " << ((OpenSSLZpSafePrimeElement *)key.get())->getElementValue() << endl;
+	//cout << "Key: " << ((OpenSSLZpSafePrimeElement *)key.get())->getElementValue() << endl;
 
 	return 0;
 }
