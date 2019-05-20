@@ -64,12 +64,8 @@ void Sensor::elgamal_setup() {
 }
 
 //Captures vec_p with identity claim u
-pair<int, vector<int>> Sensor::capture(pair<int, int> template_size) {
-	unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-	srand(seed);
-	int u = rand();
-
-	cout << "u: " << u << endl;
+pair<int, vector<int>> Sensor::capture(int u, pair<int, int> template_size) {
+	cout << "capture(): u: " << u << endl;
 
 	vector<int> vec_p;
 
@@ -83,6 +79,16 @@ pair<int, vector<int>> Sensor::capture(pair<int, int> template_size) {
 	}
 
 	return make_pair(u, vec_p);
+}
+
+//Captures vec_p with random identity claim u
+pair<int, vector<int>> Sensor::capture(pair<int, int> template_size) {
+	unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+	srand(seed);
+	int u = rand();
+	cout << "capture(): u: " << u << endl;
+
+	capture(u, template_size);
 }
 
 //Encrypt template using ElGamal
@@ -107,15 +113,18 @@ shared_ptr<Template_enc> Sensor::encrypt_template(Template T) {
 		T_enc.add_col(vec_col_enc);
 	}
 
+	cout << "succesfully encrypted template" << endl;
+
 	return make_shared<Template_enc>(T_enc);
 }
 
-tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> Sensor::enroll(pair<int, int> template_size) {
+tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> Sensor::enroll(int u, pair<int, int> template_size, int min_s, int max_s) {
 	//Step 1
-	pair<int, vector<int>> u_vec_p = capture(template_size);
+	pair<int, vector<int>> u_vec_p = capture(u, template_size);
+	cout << "enrolled with u: " << u << endl;
 
 	//Step 2 Construct Template_enc
-	Template T;
+	Template T(template_size, min_s, max_s);
 
 	//Step 3 Encrypte template T
 	shared_ptr<Template_enc> T_enc = encrypt_template(T);
@@ -170,6 +179,8 @@ assert vec_p.size() == T_enc.T_enc.size()
 assert \forall p in vec_p: 0 <= p < col
 */
 vector<shared_ptr<AsymmetricCiphertext>> Sensor::look_up(vector<int> vec_p, shared_ptr<Template_enc> T_enc) {
+	cout << "vec_p size: " << vec_p.size()  << endl;
+	cout << "T_enc size: " << T_enc->size().first << T_enc->size().second << endl;
 	vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc;
 
 	vector<vector<shared_ptr<AsymmetricCiphertext>>> T = T_enc->T_enc;
@@ -180,6 +191,8 @@ vector<shared_ptr<AsymmetricCiphertext>> Sensor::look_up(vector<int> vec_p, shar
 
 		vec_s_enc.push_back(s);
 	}
+
+	cout << "in lookup, size(vec_s_enc): " << vec_s_enc.size() << ". Should be " << T_enc->size().first << endl;
 
 	return vec_s_enc;
 }

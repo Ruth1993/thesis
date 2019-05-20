@@ -29,6 +29,8 @@ public:
   biginteger get(int i, int j);
 
   void print();
+
+  pair<int, int> size();
 };
 
 class Template_enc {
@@ -37,7 +39,7 @@ class Template_enc {
 
   void add_col(vector<shared_ptr<AsymmetricCiphertext>> vec_col_enc);
 
-  void print();
+  pair<int, int> size();
 };
 
 int main_tp();
