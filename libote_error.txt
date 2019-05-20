@@ -1,7 +1,0 @@
-g++ -c -g -std=c++14 -Iinstall/include -Iinstall/include/OTExtensionBristol -Iinstall/include/libOTe -Iinstall/include/libOTe/cryptoTools -mavx -maes -msse4.1 -mpclmul -Wall -Wno-uninitialized -Wno-unused-but-set-variable -Wno-unused-function -Wno-unused-variable -Wno-unused-result -Wno-sign-compare -Wno-parentheses -O3 -fPIC -o obj/comm/Network.o src/comm/Network.cpp
-In file included from src/comm/Network.cpp:16:0:
-src/comm/../../include/comm/utils.h:8:31: fatal error: log4cpp/Category.hh: No such file or directory
-compilation terminated.
-makefile:110: recipe for target 'obj/comm/Network.o' failed
-make: *** [obj/comm/Network.o] Error 1
-
