@@ -22,6 +22,8 @@ private:
 public:
 	Sensor(shared_ptr<OpenSSLDlogZpSafePrime> dlogg);
 
+	void ugly_setup(pair<shared_ptr<PublicKey>, shared_ptr<PrivateKey>> key_pair);
+
 	vector<unsigned char> int_to_byte(int a);
 
 	vector<unsigned char> int_to_byte(int a, int len);

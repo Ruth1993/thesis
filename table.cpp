@@ -9,9 +9,6 @@ shared_ptr<Template_enc> Table::get_T_enc(int u) {
   for(Table_Entry entry : table) {
     if(entry.u == u) {
       T_enc = entry.T_enc;
-      cout << "encrypted template found" << endl;
-    } else {
-      cout << "encrypted template not found" << endl;
     }
   }
 
@@ -24,9 +21,6 @@ pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> Table::g
   for(Table_Entry entry : table) {
     if(entry.u == u) {
       key_pair = make_pair(entry.K_enc, entry.K_aes);
-      cout << "key pair found in database" << endl;
-    } else {
-      cout << "key pair not found" << endl;
     }
   }
 

@@ -22,7 +22,14 @@ Sensor::Sensor(shared_ptr<OpenSSLDlogZpSafePrime> dlogg) {
 	dlog = dlogg;
 	elgamal = make_shared<ElGamalOnGroupElementEnc>(dlog);
 
-	auto key_pair = elgamal->generateKey();
+	auto g = dlog->getGenerator();
+	biginteger q = dlog->getOrder();
+
+	//auto key_pair = elgamal->generateKey();
+	//elgamal->setKey(key_pair.first, key_pair.second);
+}
+
+void Sensor::ugly_setup(pair<shared_ptr<PublicKey>, shared_ptr<PrivateKey>> key_pair) {
 	elgamal->setKey(key_pair.first, key_pair.second);
 }
 
@@ -185,8 +192,6 @@ assert vec_p.size() == T_enc.T_enc.size()
 assert \forall p in vec_p: 0 <= p < col
 */
 vector<shared_ptr<AsymmetricCiphertext>> Sensor::look_up(vector<int> vec_p, shared_ptr<Template_enc> T_enc) {
-	cout << "vec_p size: " << vec_p.size()  << endl;
-	cout << "T_enc size: " << T_enc->size().first << T_enc->size().second << endl;
 	vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc;
 
 	vector<vector<shared_ptr<AsymmetricCiphertext>>> T = T_enc->T_enc;
@@ -198,15 +203,13 @@ vector<shared_ptr<AsymmetricCiphertext>> Sensor::look_up(vector<int> vec_p, shar
 		vec_s_enc.push_back(s);
 	}
 
-	cout << "in lookup, size(vec_s_enc): " << vec_s_enc.size() << ". Should be " << T_enc->size().first << endl;
-
 	return vec_s_enc;
 }
 
 shared_ptr<GroupElement> Sensor::check_key(vector<shared_ptr<GroupElement>> vec_B, shared_ptr<SymmetricCiphertext> aes_K) {
 	auto g = dlog->getGenerator();
 
-	auto B_i = dlog->exponentiate(g.get(), 0); //initiate result with g^0 = 1
+	auto result = dlog->exponentiate(g.get(), 0); //initiate result with g^0 = 1
 
 	for(shared_ptr<GroupElement> B_i : vec_B) {
 		vector<unsigned char> B_i_bytes = dlog->decodeGroupElementToByteArray(B_i.get());
@@ -222,12 +225,12 @@ shared_ptr<GroupElement> Sensor::check_key(vector<shared_ptr<GroupElement>> vec_
 		cout << "B_i: " << ((OpenSSLZpSafePrimeElement *)B_i.get())->getElementValue() << endl;
 
 		if(decryption_int == 1) {
-			B_i = B_i;
+			result = B_i;
 			break;
 		}
 	}
 
-	return B_i;
+	return result;
 }
 
 //Add up all scores contained in vec_s_enc
@@ -239,6 +242,16 @@ shared_ptr<AsymmetricCiphertext> Sensor::add_scores(vector<shared_ptr<Asymmetric
 		result = elgamal->multiply(result.get(), vec_s_enc[i].get());
 	}
 
+	/*shared_ptr<Plaintext> plaintext = elgamal->decrypt(result.get());
+	cout << "Added scores: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)plaintext.get())->getElement()).get())->getElementValue() << endl;
+
+	auto g = dlog->getGenerator();
+
+	for(int i=0; i<30; i++) {
+		auto gi = dlog->exponentiate(g.get(), i);
+		cout << "i= " << i << ", g^i= " << ((OpenSSLZpSafePrimeElement *)gi.get())->getElementValue() << endl;
+	}*/
+
 	return result;
 }
 
@@ -249,7 +262,7 @@ vector<shared_ptr<GroupElement>> Sensor::decrypt_vec_B_enc(vector<shared_ptr<Asy
 		shared_ptr<Plaintext> plaintext = elgamal->decrypt(B_i_enc.get());
 		shared_ptr<GroupElement> B_i = ((GroupElementPlaintext*)plaintext.get())->getElement();
 		vec_B.push_back(B_i);
-		cout << "C_i: " << ((OpenSSLZpSafePrimeElement *)B_i.get())->getElementValue() << endl;
+		cout << "B_i: " << ((OpenSSLZpSafePrimeElement *)B_i.get())->getElementValue() << endl;
 	}
 
 	return vec_B;
@@ -263,7 +276,7 @@ void Sensor::test_look_up() {
 
 	shared_ptr<Template_enc> T_enc = encrypt_template(T);
 
-	vector<int> vec_p = {0, 1, 2};
+	vector<int> vec_p = {0, 0, 0};
 
 	vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc = look_up(vec_p, T_enc);
 
