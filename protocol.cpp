@@ -27,8 +27,6 @@ int main() {
 
 	sv.store_table(enrollment);
 
-	//cout << "table size server: " << sv.size_table() << endl;
-
 	pair<int, vector<int>> u_vec_p = ss.capture(u, template_size);
 
 	shared_ptr<Template_enc> T_enc = sv.fetch_template(u);
