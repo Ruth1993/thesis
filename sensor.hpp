@@ -22,7 +22,9 @@ private:
 public:
 	Sensor(shared_ptr<OpenSSLDlogZpSafePrime> dlogg);
 
-	void ugly_setup(pair<shared_ptr<PublicKey>, shared_ptr<PrivateKey>> key_pair);
+	shared_ptr<PublicKey> key_gen();
+
+	void key_setup(shared_ptr<PublicKey> pk_sv);
 
 	vector<unsigned char> int_to_byte(int a);
 

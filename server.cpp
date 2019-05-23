@@ -17,16 +17,24 @@ Server::Server(shared_ptr<OpenSSLDlogZpSafePrime> dlogg) {
 
 	auto g = dlog->getGenerator();
 	biginteger q = dlog->getOrder();
-
-	//auto key_pair = elgamal->generateKey();
-	//elgamal->setKey(key_pair.first, key_pair.second);
 }
 
-pair<shared_ptr<PublicKey>, shared_ptr<PrivateKey>> Server::ugly_setup() {
-	auto key_pair = elgamal->generateKey();
-	elgamal->setKey(key_pair.first, key_pair.second);
+shared_ptr<PublicKey> Server::key_gen() {
+	auto pair = elgamal->generateKey();
 
-	return key_pair;
+	shared_ptr<PublicKey> pk_sv = pair.first;
+	shared_ptr<PrivateKey> sk_sv = pair.second;
+
+	elgamal->setKey(pk_sv, sk_sv);
+
+	return pk_sv;
+}
+
+void Server::key_setup(shared_ptr<PublicKey> pk_ss) {
+	shared_ptr<GroupElement> h_shared = dlog->exponentiate(((ElGamalPublicKey*) pk_ss.get())->getH().get(), elgamal->privateKey->getX());
+	shared_ptr<PublicKey> pk_shared = make_shared<ElGamalPublicKey>(ElGamalPublicKey(h_shared));
+
+	elgamal->setKey(pk_shared);
 }
 
 //add random table entry

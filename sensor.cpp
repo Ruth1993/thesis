@@ -29,8 +29,22 @@ Sensor::Sensor(shared_ptr<OpenSSLDlogZpSafePrime> dlogg) {
 	//elgamal->setKey(key_pair.first, key_pair.second);
 }
 
-void Sensor::ugly_setup(pair<shared_ptr<PublicKey>, shared_ptr<PrivateKey>> key_pair) {
-	elgamal->setKey(key_pair.first, key_pair.second);
+shared_ptr<PublicKey> Sensor::key_gen() {
+	auto pair = elgamal->generateKey();
+
+	shared_ptr<PublicKey> pk_ss = pair.first;
+	shared_ptr<PrivateKey> sk_ss = pair.second;
+
+	elgamal->setKey(pk_ss, sk_ss);
+
+	return pk_sv;
+}
+
+void Sensor::key_setup(shared_ptr<PublicKey> pk_sv) {
+	shared_ptr<GroupElement> h_shared = dlog->exponentiate(((ElGamalPublicKey*) pk_sv.get())->getH().get(), elgamal->privateKey->getX());
+	shared_ptr<PublicKey> pk_shared = make_shared<ElGamalPublicKey>(ElGamalPublicKey(h_shared));
+
+	elgamal->setKey(pk_shared);
 }
 
 vector<unsigned char> Sensor::int_to_byte(int a) {

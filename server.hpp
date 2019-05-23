@@ -26,7 +26,9 @@ private:
 public:
 	Server(shared_ptr<OpenSSLDlogZpSafePrime> dlogg);
 
-	pair<shared_ptr<PublicKey>, shared_ptr<PrivateKey>> ugly_setup();
+	shared_ptr<PublicKey> key_gen();
+
+	void key_setup(shared_ptr<PublicKey> pk_ss);
 
 	void store_table(tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enrollment);
 

@@ -17,9 +17,12 @@ int main() {
 	Server sv(dlog);
 	Sensor ss(dlog);
 
-//Don't copy this ugly setup setting, it's for testing purposes only
-	pair<shared_ptr<PublicKey>, shared_ptr<PrivateKey>> key_pair_elgamal = sv.ugly_setup();
-	ss.ugly_setup(key_pair_elgamal);
+	//ElGamal threshold key setup
+	shared_ptr<PublicKey> pk_sv = sv.key_gen();
+	shared_ptr<PublicKey> pk_ss = ss.key_gen();
+
+	sv.key_setup(pk_ss);
+	ss.key_setup(pk_sv);
 
 	int u = 1;
 
