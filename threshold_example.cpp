@@ -25,6 +25,7 @@ int main(int argc, char* argv[]){
   shared_ptr<PrivateKey> sk_p2 = pair2.second;
 
   elGamal1.setKey(pk_p1, sk_p1);
+
   elGamal2.setKey(pk_p2, sk_p2);
 
   //Party 1 computes shared public key of both parties:
@@ -45,14 +46,26 @@ int main(int argc, char* argv[]){
 	shared_ptr<GroupElement> c_1_prime = dlog->exponentiate(((ElGamalOnGroupElementCiphertext*) E_m.get())->getC1().get(), ((ElGamalPrivateKey*) sk_p2.get())->getX());
 	ElGamalOnGroupElementCiphertext E_m_prime = ElGamalOnGroupElementCiphertext(c_1_prime, ((ElGamalOnGroupElementCiphertext*) E_m.get())->getC2());
 
-	//Now Party 1 does the final decryption Step
-	shared_ptr<Plaintext> plaintext = elGamal1.decrypt(&E_m_prime);
+	//multiply with element encrypted under private key of party 1
+	elGamal1.setKey(pk_p1);
+	auto k = dlog->createRandomElement();
+	GroupElementPlaintext p_k(k);
+	shared_ptr<AsymmetricCiphertext> E_k = elGamal1.encrypt(make_shared<GroupElementPlaintext>(p_k));
 
+	shared_ptr<AsymmetricCiphertext> result = elGamal1.multiply(&E_m_prime, ((ElGamalOnGroupElementCiphertext*) E_k.get()));
+
+	//Now Party 1 does the final decryption Step
+	shared_ptr<Plaintext> plaintext = elGamal1.decrypt(result.get());
+
+	//Now check if D([m]*[k]) is indeed m*k
+	shared_ptr<GroupElement> test_result = dlog->multiplyGroupElements(m.get(), k.get());
 
 	cout << "m:              " << ((OpenSSLZpSafePrimeElement *)m.get())->getElementValue() << endl;
-	cout << "shared h for party 1:       " << ((OpenSSLZpSafePrimeElement *)h_shared1.get())->getElementValue() << endl;
-	cout << "shared h for party 2:       " << ((OpenSSLZpSafePrimeElement *)h_shared2.get())->getElementValue() << endl;
+	cout << "k:              " << ((OpenSSLZpSafePrimeElement *)k.get())->getElementValue() << endl;
+	cout << "shared h for party 1:		" << ((OpenSSLZpSafePrimeElement *)h_shared1.get())->getElementValue() << endl;
+	cout << "shared h for party 2:		" << ((OpenSSLZpSafePrimeElement *)h_shared2.get())->getElementValue() << endl;
 	cout << "decrypted ciphertext is: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)plaintext.get())->getElement()).get())->getElementValue() << endl;
+	cout << "m*k:       							" << ((OpenSSLZpSafePrimeElement *)test_result.get())->getElementValue() << endl;
 
 	return 0;
 }

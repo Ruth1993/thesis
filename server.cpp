@@ -23,7 +23,7 @@ shared_ptr<PublicKey> Server::key_gen() {
 	auto pair = elgamal->generateKey();
 
 	shared_ptr<PublicKey> pk_sv = pair.first;
-	shared_ptr<PrivateKey> sk_sv = pair.second;
+	sk_sv = pair.second;
 
 	elgamal->setKey(pk_sv, sk_sv);
 
@@ -31,7 +31,9 @@ shared_ptr<PublicKey> Server::key_gen() {
 }
 
 void Server::key_setup(shared_ptr<PublicKey> pk_ss) {
-	shared_ptr<GroupElement> h_shared = dlog->exponentiate(((ElGamalPublicKey*) pk_ss.get())->getH().get(), elgamal->privateKey->getX());
+	shared_ptr<GroupElement> h_shared = dlog->exponentiate(((ElGamalPublicKey*) pk_ss.get())->getH().get(), ((ElGamalPrivateKey*) sk_sv.get())->getX());
+
+	cout << "h_shared for server: " << ((OpenSSLZpSafePrimeElement *)h_shared.get())->getElementValue() << endl;
 	shared_ptr<PublicKey> pk_shared = make_shared<ElGamalPublicKey>(ElGamalPublicKey(h_shared));
 
 	elgamal->setKey(pk_shared);
@@ -86,6 +88,25 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::permute(vector<shared_ptr<Asymm
 	shuffle(vec_cap_c_enc.begin(), vec_cap_c_enc.end(), default_random_engine(seed));
 
 	return vec_cap_c_enc;
+}
+
+
+//Perform decryption step D1
+vector<shared_ptr<AsymmetricCiphertext>> Server::D1(vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc) {
+	vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc2;
+
+	for(shared_ptr<AsymmetricCiphertext> C_i_enc : vec_C_enc) {
+		//((ElGamalPublicKey*) pk_ss.get())->getH().get()
+		//((ElGamalOnGroupElementCiphertext) C_i_enc.get())->getC2()
+		//shared_ptr<GroupElement> c1_prime = dlog->exponentiate(((ElGamalOnGroupElementCiphertext*) C_i_enc.get())->getC1().get(), ((ElGamalPrivateKey*) sk_sv.get())->getX());
+		//vec_C_enc2.push_back(ElGamalOnGroupElementCiphertext(c1_prime, ((ElGamalOnGroupElementCiphertext*) C_i_enc.get())->getC2()));
+
+		shared_ptr<GroupElement> c1_prime = dlog->exponentiate(((ElGamalOnGroupElementCiphertext*) C_i_enc.get())->getC1().get(), ((ElGamalPrivateKey*) sk_sv.get())->getX());
+		ElGamalOnGroupElementCiphertext C_i_enc2 = ElGamalOnGroupElementCiphertext(c1_prime, ((ElGamalOnGroupElementCiphertext*) C_i_enc.get())->getC2());
+		vec_C_enc2.push_back(make_shared<ElGamalOnGroupElementCiphertext>(C_i_enc2));
+	}
+
+	return vec_C_enc2;
 }
 
 pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> Server::fetch_key_pair(int u) {

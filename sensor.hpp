@@ -19,6 +19,9 @@ private:
  	shared_ptr<OpenSSLDlogZpSafePrime> dlog;
 	shared_ptr<ElGamalOnGroupElementEnc> elgamal;
 
+	shared_ptr<PublicKey> pk_ss;
+	shared_ptr<PrivateKey> sk_ss;
+
 public:
 	Sensor(shared_ptr<OpenSSLDlogZpSafePrime> dlogg);
 

@@ -32,16 +32,18 @@ Sensor::Sensor(shared_ptr<OpenSSLDlogZpSafePrime> dlogg) {
 shared_ptr<PublicKey> Sensor::key_gen() {
 	auto pair = elgamal->generateKey();
 
-	shared_ptr<PublicKey> pk_ss = pair.first;
-	shared_ptr<PrivateKey> sk_ss = pair.second;
+	pk_ss = pair.first;
+	sk_ss = pair.second;
 
 	elgamal->setKey(pk_ss, sk_ss);
 
-	return pk_sv;
+	return pk_ss;
 }
 
 void Sensor::key_setup(shared_ptr<PublicKey> pk_sv) {
-	shared_ptr<GroupElement> h_shared = dlog->exponentiate(((ElGamalPublicKey*) pk_sv.get())->getH().get(), elgamal->privateKey->getX());
+	shared_ptr<GroupElement> h_shared = dlog->exponentiate(((ElGamalPublicKey*) pk_sv.get())->getH().get(), ((ElGamalPrivateKey*) sk_ss.get())->getX());
+
+	cout << "h_shared for sensor: " << ((OpenSSLZpSafePrimeElement *)h_shared.get())->getElementValue() << endl;
 	shared_ptr<PublicKey> pk_shared = make_shared<ElGamalPublicKey>(ElGamalPublicKey(h_shared));
 
 	elgamal->setKey(pk_shared);
@@ -77,11 +79,6 @@ void Sensor::pad(vector<unsigned char> &input, int bits) {
 			input.push_back(byte_zeros[0]);
 		}
 	}
-}
-
-//Setup Elgamal threshold system with server
-void Sensor::elgamal_setup() {
-
 }
 
 //Captures vec_p with identity claim u
@@ -166,7 +163,8 @@ tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shar
 	//K = g^k
 	auto cap_k = dlog->exponentiate(g.get(), k);
 
-	//Step 5: encrypt K
+	//Step 5: encrypt K, but first set pk to pk_ss
+	elgamal->setKey(pk_ss);
 	GroupElementPlaintext p_cap_k(cap_k);
 	shared_ptr<AsymmetricCiphertext> cap_k_enc = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_cap_k));
 

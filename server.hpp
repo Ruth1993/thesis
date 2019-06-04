@@ -20,6 +20,8 @@ private:
  	shared_ptr<OpenSSLDlogZpSafePrime> dlog;
 	shared_ptr<ElGamalOnGroupElementEnc> elgamal;
 
+	shared_ptr<PrivateKey> sk_sv;
+
 	//Table
 	Table table;
 
@@ -37,6 +39,8 @@ public:
 	vector<shared_ptr<AsymmetricCiphertext>> compare(shared_ptr<AsymmetricCiphertext> cap_s_enc, biginteger t, biginteger max_s);
 
 	vector<shared_ptr<AsymmetricCiphertext>> permute(vector<shared_ptr<AsymmetricCiphertext>> cap_c_enc);
+
+	vector<shared_ptr<AsymmetricCiphertext>> D1(vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc);
 
 	pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> fetch_key_pair(int u);
 
