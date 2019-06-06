@@ -336,6 +336,46 @@ void Sensor::test_add_scores() {
 	cout << "decrypted total score: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)plaintext.get())->getElement()).get())->getElementValue() << endl;
 }
 
+vector<shared_ptr<AsymmetricCiphertext>> Sensor::encrypt_scores(int nr) {
+	vector<shared_ptr<AsymmetricCiphertext>> result;
+
+	auto g = dlog->getGenerator();
+
+	biginteger total_nr = 0;
+
+	for(int i=0; i<nr; i++) {
+
+		// create a random exponent r
+		auto gen = get_seeded_prg();
+		biginteger r = getRandomInRange(0, 0, gen.get());
+
+		total_nr+=r;
+
+		auto g1 = dlog->exponentiate(g.get(), r);
+
+		GroupElementPlaintext p1(g1);
+
+		shared_ptr<AsymmetricCiphertext> cipher = elgamal->encrypt(make_shared<GroupElementPlaintext>(p1));
+
+		result.push_back(cipher);
+
+		cout << "value " << i << ":          " << r << endl;
+	}
+
+
+	shared_ptr<AsymmetricCiphertext> g_total1 = result[0];
+
+	for(int i=1; i<nr; i++) {
+		g_total1 = elgamal->multiply(g_total1.get(), result[i].get());
+	}
+
+	auto g_total2 = dlog->exponentiate(g.get(), total_nr);
+
+	cout << "g^total:              " << ((OpenSSLZpSafePrimeElement *)g_total2.get())->getElementValue() << endl;
+
+	return result;
+}
+
 int main_ss() {
 	Sensor ss(make_shared<OpenSSLDlogZpSafePrime>(128));
 

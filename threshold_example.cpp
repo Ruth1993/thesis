@@ -41,6 +41,8 @@ int main(int argc, char* argv[]){
 	//Party 2 computes shared public key of both parties
 	//assert h_stared1 == h_shared2
 	shared_ptr<GroupElement> h_shared2 = dlog->exponentiate(((ElGamalPublicKey*) pk_p1.get())->getH().get(), ((ElGamalPrivateKey*) sk_p2.get())->getX());
+	 shared_ptr<PublicKey> pk_shared2 = make_shared<ElGamalPublicKey>(ElGamalPublicKey(h_shared2));
+	elGamal2.setKey(pk_shared2);
 
   //Party 2 does a partial decryption of E(m) by computing c_1^sk_p2
 	shared_ptr<GroupElement> c_1_prime = dlog->exponentiate(((ElGamalOnGroupElementCiphertext*) E_m.get())->getC1().get(), ((ElGamalPrivateKey*) sk_p2.get())->getX());

@@ -49,7 +49,7 @@ shared_ptr<Template_enc> Server::fetch_template(int u) {
 }
 
 vector<shared_ptr<AsymmetricCiphertext>> Server::compare(shared_ptr<AsymmetricCiphertext> cap_s_enc, biginteger t, biginteger max_S) {
-	vector<shared_ptr<AsymmetricCiphertext>> vec_cap_c_enc;
+	vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc;
 
 	auto g = dlog->getGenerator();
 	auto g_t = dlog->exponentiate(g.get(), t);
@@ -75,19 +75,19 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::compare(shared_ptr<AsymmetricCi
 		shared_ptr<AsymmetricCiphertext> result = elgamal->multiply(cap_s_enc.get(), c_g_min_t.get());
 		result = elgamal->multiply(result.get(), c_g_min_i.get());
 
-		//save result in cap_c_enc
-		vec_cap_c_enc.push_back(result);
+		//save result in C_enc
+		vec_C_enc.push_back(result);
 	}
 
-	return vec_cap_c_enc;
+	return vec_C_enc;
 }
 
 //Permute [[C]]
-vector<shared_ptr<AsymmetricCiphertext>> Server::permute(vector<shared_ptr<AsymmetricCiphertext>> vec_cap_c_enc) {
+vector<shared_ptr<AsymmetricCiphertext>> Server::permute(vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc) {
 	unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-	shuffle(vec_cap_c_enc.begin(), vec_cap_c_enc.end(), default_random_engine(seed));
+	shuffle(vec_C_enc.begin(), vec_C_enc.end(), default_random_engine(seed));
 
-	return vec_cap_c_enc;
+	return vec_C_enc;
 }
 
 
@@ -113,15 +113,15 @@ pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> Server::
 	return table.get_key_pair(u);
 }
 
-vector<shared_ptr<AsymmetricCiphertext>> Server::potential_keys(vector<shared_ptr<AsymmetricCiphertext>> vec_cap_c_enc2, shared_ptr<AsymmetricCiphertext> cap_k_enc2) {
-	vector<shared_ptr<AsymmetricCiphertext>> cap_b_enc2;
+vector<shared_ptr<AsymmetricCiphertext>> Server::potential_keys(vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc2, shared_ptr<AsymmetricCiphertext> cap_k_enc2) {
+	vector<shared_ptr<AsymmetricCiphertext>> B_enc2;
 
-	for(shared_ptr<AsymmetricCiphertext> cap_c_i_enc2 : vec_cap_c_enc2) {
-		shared_ptr<AsymmetricCiphertext> cap_b_i_enc2 = elgamal->multiply(cap_c_i_enc2.get(), cap_k_enc2.get());
-		cap_b_enc2.push_back(cap_b_i_enc2);
+	for(shared_ptr<AsymmetricCiphertext> C_i_enc2 : vec_C_enc2) {
+		shared_ptr<AsymmetricCiphertext> B_i_enc2 = elgamal->multiply(C_i_enc2.get(), cap_k_enc2.get());
+		B_enc2.push_back(B_i_enc2);
 	}
 
-	return cap_b_enc2;
+	return B_enc2;
 }
 
 int Server::size_table() {
@@ -167,12 +167,12 @@ void Server::test_compare(biginteger t, biginteger max_S) {
 		GroupElementPlaintext p_g_cap_s(g_cap_s);
 		shared_ptr<AsymmetricCiphertext> c_g_cap_s = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_cap_s));
 
-		vector<shared_ptr<AsymmetricCiphertext>> vec_cap_c_enc = compare(c_g_cap_s, t, max_S);
+		vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc = compare(c_g_cap_s, t, max_S);
 
 		//test if there's a C_i that equals 1 when decrypted
-		for(shared_ptr<AsymmetricCiphertext> cap_c_i_enc : vec_cap_c_enc) {
-			shared_ptr<Plaintext> cap_c_i = elgamal->decrypt(cap_c_i_enc.get());
-			cout << "C_i: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)cap_c_i.get())->getElement()).get())->getElementValue() << endl;
+		for(shared_ptr<AsymmetricCiphertext> C_i_enc : vec_C_enc) {
+			shared_ptr<Plaintext> C_i = elgamal->decrypt(C_i_enc.get());
+			cout << "C_i: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)C_i.get())->getElement()).get())->getElementValue() << endl;
 		}
 
 		cout << endl;
@@ -187,22 +187,22 @@ void Server::test_permute(biginteger cap_s, biginteger t, biginteger max_s) {
 	GroupElementPlaintext p_g_cap_s(g_cap_s);
 	shared_ptr<AsymmetricCiphertext> c_g_cap_s = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_cap_s));
 
-	vector<shared_ptr<AsymmetricCiphertext>> vec_cap_c_enc = compare(c_g_cap_s, t, max_s);
+	vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc = compare(c_g_cap_s, t, max_s);
 
 	//print all C_i
-	for(shared_ptr<AsymmetricCiphertext> cap_c_i_enc : vec_cap_c_enc) {
-		shared_ptr<Plaintext> cap_c_i = elgamal->decrypt(cap_c_i_enc.get());
-		cout << "C_i: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)cap_c_i.get())->getElement()).get())->getElementValue() << endl;
+	for(shared_ptr<AsymmetricCiphertext> C_i_enc : vec_C_enc) {
+		shared_ptr<Plaintext> C_i = elgamal->decrypt(C_i_enc.get());
+		cout << "C_i: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)C_i.get())->getElement()).get())->getElementValue() << endl;
 	}
 
 	cout << endl;
 
-	vector<shared_ptr<AsymmetricCiphertext>> vec_cap_c_enc_prime = permute(vec_cap_c_enc);
+	vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc_prime = permute(vec_C_enc);
 
 	//print all C_i when [[C]] has been permuted
-	for(shared_ptr<AsymmetricCiphertext> cap_c_i_enc_prime : vec_cap_c_enc_prime) {
-		shared_ptr<Plaintext> cap_c_i_prime = elgamal->decrypt(cap_c_i_enc_prime.get());
-		cout << "C_i': " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)cap_c_i_prime.get())->getElement()).get())->getElementValue() << endl;
+	for(shared_ptr<AsymmetricCiphertext> C_i_enc_prime : vec_C_enc_prime) {
+		shared_ptr<Plaintext> C_i_prime = elgamal->decrypt(C_i_enc_prime.get());
+		cout << "C_i': " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)C_i_prime.get())->getElement()).get())->getElementValue() << endl;
 	}
 }
 

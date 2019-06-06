@@ -58,6 +58,8 @@ public:
 	void test_look_up();
 
 	void test_add_scores();
+
+	vector<shared_ptr<AsymmetricCiphertext>> encrypt_scores(int nr);
 };
 
 int main_ss();
