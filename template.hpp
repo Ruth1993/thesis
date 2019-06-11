@@ -40,6 +40,8 @@ class Template_enc {
   void add_col(vector<shared_ptr<AsymmetricCiphertext>> vec_col_enc);
 
   pair<int, int> size();
+
+  shared_ptr<AsymmetricCiphertext> get(int i, int j);
 };
 
 int main_tp();

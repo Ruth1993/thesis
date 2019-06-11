@@ -28,7 +28,21 @@ Template::Template(pair<int, int> size, biginteger min_s, biginteger max_s) {
 }
 
 Template::Template() {
-  Template(make_pair(3, 2), 0, 10);
+  k = 3;
+  b = 2;
+
+  int col = pow(2, b);
+
+  for(int i=0; i<k; i++) {
+    vector<biginteger> vec_col;
+
+    for(int j=0; j<col; j++) {
+      // create a random value s_{i,j}
+      vec_col.push_back(j);
+    }
+
+    T.push_back(vec_col);
+  }
 }
 
 int Template::get_b() {
@@ -69,6 +83,11 @@ void Template_enc::add_col(vector<shared_ptr<AsymmetricCiphertext>> vec_col_enc)
 
 pair<int, int> Template_enc::size() {
   return make_pair(T_enc.size(), T_enc[0].size());
+}
+
+//Get element on position x,y
+shared_ptr<AsymmetricCiphertext> Template_enc::get(int i, int j) {
+  return T_enc[i][j];
 }
 
 int main_tp() {

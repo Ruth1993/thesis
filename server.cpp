@@ -39,6 +39,11 @@ void Server::key_setup(shared_ptr<PublicKey> pk_ss) {
 	elgamal->setKey(pk_shared);
 }
 
+shared_ptr<ElGamalOnGroupElementCiphertext> Server::test_partial_decrypt(shared_ptr<AsymmetricCiphertext> cipher) {
+	shared_ptr<GroupElement> c_1_prime = dlog->exponentiate(((ElGamalOnGroupElementCiphertext*) cipher.get())->getC1().get(), ((ElGamalPrivateKey*) sk_sv.get())->getX());
+	return make_shared<ElGamalOnGroupElementCiphertext>(ElGamalOnGroupElementCiphertext(c_1_prime, ((ElGamalOnGroupElementCiphertext*) cipher.get())->getC2()));
+}
+
 //add random table entry
 void Server::store_table(tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enrollment) {
 	table.add_entry(get<0>(enrollment), get<1>(enrollment), get<2>(enrollment).first, get<2>(enrollment).second);

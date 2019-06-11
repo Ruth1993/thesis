@@ -29,6 +29,12 @@ public:
 
 	void key_setup(shared_ptr<PublicKey> pk_sv);
 
+	shared_ptr<AsymmetricCiphertext> test_encrypt();
+
+	void test_add();
+
+	void test_decrypt(shared_ptr<ElGamalOnGroupElementCiphertext> cipher);
+
 	vector<unsigned char> int_to_byte(int a);
 
 	vector<unsigned char> int_to_byte(int a, int len);
@@ -53,7 +59,7 @@ public:
 
 	shared_ptr<GroupElement> check_key(vector<shared_ptr<GroupElement>> vec_B, shared_ptr<SymmetricCiphertext> aes_K);
 
-	vector<shared_ptr<GroupElement>> decrypt_vec_B_enc(vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc);
+	vector<shared_ptr<GroupElement>> decrypt_vec_B_enc2(vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc);
 
 	void test_look_up();
 

@@ -26,6 +26,7 @@ int main() {
 
 	int u = 1;
 
+
 	tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enrollment = ss.enroll(u, template_size, min_s, max_s);
 
 	sv.store_table(enrollment);
@@ -35,17 +36,26 @@ int main() {
 	shared_ptr<Template_enc> T_enc = sv.fetch_template(u);
 
 	//cout << "T_enc size: " << T_enc->size().first << T_enc->size().second << endl;
-	//vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc = ss.look_up(u_vec_p.second, T_enc);
+	vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc = ss.look_up(u_vec_p.second, T_enc);
 
-	vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc = ss.encrypt_scores(4);
 	shared_ptr<AsymmetricCiphertext> S_enc = ss.add_scores(vec_s_enc);
+
+	/*shared_ptr<AsymmetricCiphertext> s1 = ss.test_encrypt();
+	shared_ptr<AsymmetricCiphertext> s2 = ss.test_encrypt();
+	shared_ptr<AsymmetricCiphertext> s3 = ss.test_encrypt();
+
+	vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc;
+	vec_s_enc.push_back(s1);
+	vec_s_enc.push_back(s2);
+	vec_s_enc.push_back(s3);
+
+	shared_ptr<AsymmetricCiphertext> S_enc = ss.add_scores(vec_s_enc);*/
 
 	vector<shared_ptr<AsymmetricCiphertext>> vec_S_enc;
 	vec_S_enc.push_back(S_enc);
 	vector<shared_ptr<AsymmetricCiphertext>> vec_S_enc2 = sv.D1(vec_S_enc);
 
-	vector<shared_ptr<GroupElement>> vec_S = ss.decrypt_vec_B_enc(vec_S_enc2);
-
+	vector<shared_ptr<GroupElement>> vec_S = ss.decrypt_vec_B_enc2(vec_S_enc2);
 
 	//vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc = sv.compare(S_enc, t, max_S);
 	//vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc_prime = sv.permute(vec_C_enc);
@@ -58,6 +68,7 @@ int main() {
 	//shared_ptr<GroupElement> key = ss.check_key(vec_B, key_pair.second);
 
 	//cout << "Key: " << ((OpenSSLZpSafePrimeElement *)key.get())->getElementValue() << endl;
+
 
 	return 0;
 }

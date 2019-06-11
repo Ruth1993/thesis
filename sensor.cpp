@@ -49,6 +49,44 @@ void Sensor::key_setup(shared_ptr<PublicKey> pk_sv) {
 	elgamal->setKey(pk_shared);
 }
 
+shared_ptr<AsymmetricCiphertext> Sensor::test_encrypt() {
+	auto g = dlog->getGenerator();
+	auto h = dlog->exponentiate(g.get(), 2);
+	shared_ptr<AsymmetricCiphertext> cipher = elgamal->encrypt(make_shared<GroupElementPlaintext>(h));
+
+	cout << "random element h is:       " << ((OpenSSLZpSafePrimeElement *)h.get())->getElementValue() << endl;
+
+	auto g2 = dlog->exponentiate(g.get(), 6);
+
+	cout << "g^6 is:       " << ((OpenSSLZpSafePrimeElement *)g2.get())->getElementValue() << endl;
+
+	return cipher;
+}
+
+void Sensor::test_add() {
+	shared_ptr<GroupElement> result;
+
+	auto g = dlog->getGenerator();
+	auto h1 = dlog->exponentiate(g.get(), 1);
+	auto h2 = dlog->exponentiate(g.get(), 9);
+	auto h3 = dlog->exponentiate(g.get(), 10);
+
+	result = dlog->multiplyGroupElements(h1.get(), h2.get());
+
+	cout << "result of manual addition is:       " << ((OpenSSLZpSafePrimeElement *)result.get())->getElementValue() << endl;
+}
+
+void Sensor::test_decrypt(shared_ptr<ElGamalOnGroupElementCiphertext> cipher) {
+	/*elgamal->setKey(pk_ss);
+	auto k = dlog->exponentiate(g.get(), 0);
+	GroupElementPlaintext p_k(k);
+	shared_ptr<AsymmetricCiphertext> E_k = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_k));
+
+	shared_ptr<AsymmetricCiphertext> result = elgamal->multiply(&E_m_prime, ((ElGamalOnGroupElementCiphertext*) E_k.get()));*/
+	shared_ptr<Plaintext> plaintext = elgamal->decrypt(cipher.get());
+	cout << "decrypted ciphertext is: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)plaintext.get())->getElement()).get())->getElementValue() << endl;
+}
+
 vector<unsigned char> Sensor::int_to_byte(int a) {
   vector<unsigned char> result(4);
 
@@ -92,9 +130,10 @@ pair<int, vector<int>> Sensor::capture(int u, pair<int, int> template_size) {
 	cout << "vec(p): ";
 
 	for(int i=0; i<template_size.first; i++) {
-		unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+		/*unsigned seed = chrono::system_clock::now().time_since_epoch().count();
 		srand(seed);
-		vec_p.push_back(rand()%len);
+		vec_p.push_back(rand()%len);*/
+		vec_p.push_back(i);
 		cout << vec_p[i] << ", ";
 	}
 
@@ -141,20 +180,43 @@ shared_ptr<Template_enc> Sensor::encrypt_template(Template T) {
 }
 
 tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> Sensor::enroll(int u, pair<int, int> template_size, int min_s, int max_s) {
+	auto g = dlog->getGenerator();
+
 	//Step 1
 	pair<int, vector<int>> u_vec_p = capture(u, template_size);
 	//pair<int, vector<int>> u_vec_p = make_pair(1, {0, 0, 0});
 	cout << "enrolled with u: " << u << endl;
 
 	//Step 2 Construct Template_enc
+	//Template T(template_size, min_s, max_s);
 	Template T(template_size, min_s, max_s);
 	T.print();
+
+	//Test
+	vector<int> vec_p = u_vec_p.second;
+	vector<shared_ptr<GroupElement>> vec_s;
+
+	for(int i=0; i<vec_p.size(); i++) {
+		biginteger s = T.get(i, vec_p[i]);
+
+		cout << "selected s:       " << s << endl;
+
+		auto gs = dlog->exponentiate(g.get(), s);
+		vec_s.push_back(gs);
+	}
+
+	shared_ptr<GroupElement> result = vec_s[0];
+
+	for(int i=1; i<vec_s.size(); i++) {
+		result = dlog->multiplyGroupElements(result.get(), vec_s[i].get());
+	}
+
+	cout << "result of manual addition is:       " << ((OpenSSLZpSafePrimeElement *)result.get())->getElementValue() << endl;
 
 	//Step 3 Encrypte template T
 	shared_ptr<Template_enc> T_enc = encrypt_template(T);
 
 	//Step 4: pick k \in_R [0, |G|]
-	auto g = dlog->getGenerator();
 	biginteger p = dlog->getOrder();
 
 	auto gen = get_seeded_prg();
@@ -209,8 +271,9 @@ vector<shared_ptr<AsymmetricCiphertext>> Sensor::look_up(vector<int> vec_p, shar
 	vector<vector<shared_ptr<AsymmetricCiphertext>>> T = T_enc->T_enc;
 
 	for(int i=0; i<T.size(); i++) {
-		vector<shared_ptr<AsymmetricCiphertext>> vec_col_enc = T[i];
-		shared_ptr<AsymmetricCiphertext> s = vec_col_enc[vec_p[i]];
+		/*vector<shared_ptr<AsymmetricCiphertext>> vec_col_enc = T[i];
+		shared_ptr<AsymmetricCiphertext> s = vec_col_enc[vec_p[i]];*/
+		shared_ptr<AsymmetricCiphertext> s = T_enc.get(i, vec_p[i]);
 
 		vec_s_enc.push_back(s);
 	}
@@ -267,11 +330,11 @@ shared_ptr<AsymmetricCiphertext> Sensor::add_scores(vector<shared_ptr<Asymmetric
 	return result;
 }
 
-vector<shared_ptr<GroupElement>> Sensor::decrypt_vec_B_enc(vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc) {
+vector<shared_ptr<GroupElement>> Sensor::decrypt_vec_B_enc2(vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc2) {
 	vector<shared_ptr<GroupElement>> vec_B;
 
-	for(shared_ptr<AsymmetricCiphertext> B_i_enc : vec_B_enc) {
-		shared_ptr<Plaintext> plaintext = elgamal->decrypt(B_i_enc.get());
+	for(shared_ptr<AsymmetricCiphertext> B_i_enc2 : vec_B_enc2) {
+		shared_ptr<Plaintext> plaintext = elgamal->decrypt(B_i_enc2.get());
 		shared_ptr<GroupElement> B_i = ((GroupElementPlaintext*)plaintext.get())->getElement();
 		vec_B.push_back(B_i);
 		cout << "B_i: " << ((OpenSSLZpSafePrimeElement *)B_i.get())->getElementValue() << endl;
