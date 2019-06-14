@@ -248,7 +248,7 @@ tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shar
 	biginteger k = getRandomInRange(0, p-1, gen.get()); //generate random k
 
 	//K = g^k
-	auto K = dlog->exponentiate(g.get(), k);
+	auto K = dlog->exponentiate(g.get(), 2); //TODO change 2 back to k
 	cout << "[k]:       " << ((OpenSSLZpSafePrimeElement *)K.get())->getElementValue() << endl;
 
 	//Step 5: encrypt K, but first set pk to pk_ss

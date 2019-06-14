@@ -126,7 +126,7 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::potential_keys(vector<shared_pt
 	vector<shared_ptr<AsymmetricCiphertext>> B_enc2;
 
 	for(shared_ptr<AsymmetricCiphertext> C_i_enc2 : vec_C_enc2) {
-		shared_ptr<AsymmetricCiphertext> B_i_enc2 = elgamal->multiply(C_i_enc2.get(), K_enc2.get());
+		shared_ptr<AsymmetricCiphertext> B_i_enc2 = elgamal->multiply((ElGamalOnGroupElementCiphertext*) C_i_enc2.get(), (ElGamalOnGroupElementCiphertext*) K_enc2.get());
 		B_enc2.push_back(B_i_enc2);
 	}
 
