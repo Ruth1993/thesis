@@ -41,7 +41,7 @@ class Template_enc {
 
   pair<int, int> size();
 
-  shared_ptr<AsymmetricCiphertext> get(int i, int j);
+  shared_ptr<AsymmetricCiphertext> get_elem(int i, int j);
 };
 
 int main_tp();

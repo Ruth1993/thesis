@@ -21,6 +21,7 @@ private:
 	shared_ptr<ElGamalOnGroupElementEnc> elgamal;
 
 	shared_ptr<PrivateKey> sk_sv;
+	shared_ptr<PublicKey> pk_shared;
 
 	//Table
 	Table table;

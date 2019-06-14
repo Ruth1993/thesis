@@ -20,6 +20,7 @@ private:
 	shared_ptr<ElGamalOnGroupElementEnc> elgamal;
 
 	shared_ptr<PublicKey> pk_ss;
+	shared_ptr<PublicKey> pk_shared;
 	shared_ptr<PrivateKey> sk_ss;
 
 public:
@@ -31,7 +32,9 @@ public:
 
 	shared_ptr<AsymmetricCiphertext> test_encrypt();
 
-	void test_add();
+	vector<shared_ptr<AsymmetricCiphertext>> test_add();
+
+	void print_outcomes();
 
 	void test_decrypt(shared_ptr<ElGamalOnGroupElementCiphertext> cipher);
 
@@ -60,6 +63,10 @@ public:
 	shared_ptr<GroupElement> check_key(vector<shared_ptr<GroupElement>> vec_B, shared_ptr<SymmetricCiphertext> aes_K);
 
 	vector<shared_ptr<GroupElement>> decrypt_vec_B_enc2(vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc);
+
+	void test_k_enc2(shared_ptr<AsymmetricCiphertext> k_enc);
+
+	shared_ptr<AsymmetricCiphertext> test_S_enc(biginteger S);
 
 	void test_look_up();
 

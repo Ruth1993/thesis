@@ -86,7 +86,7 @@ pair<int, int> Template_enc::size() {
 }
 
 //Get element on position x,y
-shared_ptr<AsymmetricCiphertext> Template_enc::get(int i, int j) {
+shared_ptr<AsymmetricCiphertext> Template_enc::get_elem(int i, int j) {
   return T_enc[i][j];
 }
 

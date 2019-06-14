@@ -44,7 +44,7 @@ void Sensor::key_setup(shared_ptr<PublicKey> pk_sv) {
 	shared_ptr<GroupElement> h_shared = dlog->exponentiate(((ElGamalPublicKey*) pk_sv.get())->getH().get(), ((ElGamalPrivateKey*) sk_ss.get())->getX());
 
 	cout << "h_shared for sensor: " << ((OpenSSLZpSafePrimeElement *)h_shared.get())->getElementValue() << endl;
-	shared_ptr<PublicKey> pk_shared = make_shared<ElGamalPublicKey>(ElGamalPublicKey(h_shared));
+	pk_shared = make_shared<ElGamalPublicKey>(ElGamalPublicKey(h_shared));
 
 	elgamal->setKey(pk_shared);
 }
@@ -63,17 +63,42 @@ shared_ptr<AsymmetricCiphertext> Sensor::test_encrypt() {
 	return cipher;
 }
 
-void Sensor::test_add() {
+vector<shared_ptr<AsymmetricCiphertext>> Sensor::test_add() {
+	vector<shared_ptr<AsymmetricCiphertext>> vec_s;
 	shared_ptr<GroupElement> result;
 
 	auto g = dlog->getGenerator();
 	auto h1 = dlog->exponentiate(g.get(), 1);
-	auto h2 = dlog->exponentiate(g.get(), 9);
-	auto h3 = dlog->exponentiate(g.get(), 10);
+	auto h2 = dlog->exponentiate(g.get(), 3);
+	auto h3 = dlog->exponentiate(g.get(), 4);
+
+	GroupElementPlaintext p1(h1);
+	GroupElementPlaintext p2(h2);
+	GroupElementPlaintext p3(h3);
+
+	shared_ptr<AsymmetricCiphertext> cipher1 = elgamal->encrypt(make_shared<GroupElementPlaintext>(p1));
+	shared_ptr<AsymmetricCiphertext> cipher2 = elgamal->encrypt(make_shared<GroupElementPlaintext>(p2));
+	shared_ptr<AsymmetricCiphertext> cipher3 = elgamal->encrypt(make_shared<GroupElementPlaintext>(p3));
+
+	vec_s.push_back(cipher1);
+	vec_s.push_back(cipher2);
+	vec_s.push_back(cipher3);
 
 	result = dlog->multiplyGroupElements(h1.get(), h2.get());
+	result = dlog->multiplyGroupElements(result.get(), h3.get());
 
-	cout << "result of manual addition is:       " << ((OpenSSLZpSafePrimeElement *)result.get())->getElementValue() << endl;
+	cout << "test_add(): result of manual addition is:       " << ((OpenSSLZpSafePrimeElement *)result.get())->getElementValue() << endl;
+
+	return vec_s;
+}
+
+void Sensor::print_outcomes() {
+	auto g = dlog->getGenerator();
+
+	for(int i=0; i<30; i++) {
+			auto h = dlog->exponentiate(g.get(), i);
+				cout << "g^" << i << ": " << ((OpenSSLZpSafePrimeElement *)h.get())->getElementValue() << endl;
+	}
 }
 
 void Sensor::test_decrypt(shared_ptr<ElGamalOnGroupElementCiphertext> cipher) {
@@ -130,9 +155,9 @@ pair<int, vector<int>> Sensor::capture(int u, pair<int, int> template_size) {
 	cout << "vec(p): ";
 
 	for(int i=0; i<template_size.first; i++) {
-		/*unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-		srand(seed);
-		vec_p.push_back(rand()%len);*/
+		//unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+		//srand(seed);
+		//vec_p.push_back(rand()%len);
 		vec_p.push_back(i);
 		cout << vec_p[i] << ", ";
 	}
@@ -223,33 +248,35 @@ tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shar
 	biginteger k = getRandomInRange(0, p-1, gen.get()); //generate random k
 
 	//K = g^k
-	auto cap_k = dlog->exponentiate(g.get(), k);
+	auto K = dlog->exponentiate(g.get(), k);
+	cout << "[k]:       " << ((OpenSSLZpSafePrimeElement *)K.get())->getElementValue() << endl;
 
 	//Step 5: encrypt K, but first set pk to pk_ss
 	elgamal->setKey(pk_ss);
-	GroupElementPlaintext p_cap_k(cap_k);
-	shared_ptr<AsymmetricCiphertext> cap_k_enc = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_cap_k));
+	GroupElementPlaintext p_K(K);
+	shared_ptr<AsymmetricCiphertext> K_enc = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_K));
+	elgamal->setKey(pk_shared);
 
 	//Step 6: AES_K(1)
-	//First copy cap_k to byte vector in order to use in AES encryption
-	vector<unsigned char> vec_cap_k = dlog->decodeGroupElementToByteArray(cap_k.get());
-	cout << vec_cap_k.size() << endl;
+	//First copy K to byte vector in order to use in AES encryption
+	vector<unsigned char> vec_K = dlog->decodeGroupElementToByteArray(K.get());
+	cout << vec_K.size() << endl;
 
-	pad(vec_cap_k, 128);
+	pad(vec_K, 128);
 
-	cout << vec_cap_k.size() << endl;
+	cout << vec_K.size() << endl;
 
-	//byte arr_cap_k[15];
-	//copy_byte_vector_to_byte_array(vec_cap_k, &arr_cap_k, 0);
-	//print_byte_array(arr_cap_k, vec_cap_k.size(), "");
-	SecretKey aes_cap_k_sk = SecretKey(vec_cap_k, "");
+	//byte arr_K[15];
+	//copy_byte_vector_to_byte_array(vec_K, &arr_K, 0);
+	//print_byte_array(arr_K, vec_K.size(), "");
+	SecretKey aes_K_sk = SecretKey(vec_K, "");
 
-	aes_enc->setKey(aes_cap_k_sk);
+	aes_enc->setKey(aes_K_sk);
 
 	vector<unsigned char> vec = int_to_byte(1);
 	ByteArrayPlaintext p1(vec);
 
-	shared_ptr<SymmetricCiphertext> aes_cap_k = aes_enc->encrypt(&p1);
+	shared_ptr<SymmetricCiphertext> aes_K = aes_enc->encrypt(&p1);
 
 	/*shared_ptr<Plaintext> p2 = aes_enc->decrypt(cipher.get());
 
@@ -258,7 +285,7 @@ tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shar
 	cout << "Ciphertext: " << ((ByteArraySymCiphertext *)cipher.get())->toString() << endl;
 	cout << "Plaintext after decryption: " << byte_to_int(((ByteArrayPlaintext *)p2.get())->getText()) << endl;*/
 
-	return make_tuple(u_vec_p.first, T_enc, make_pair(cap_k_enc, aes_cap_k));
+	return make_tuple(u_vec_p.first, T_enc, make_pair(K_enc, aes_K));
 }
 
 /*
@@ -268,12 +295,10 @@ assert \forall p in vec_p: 0 <= p < col
 vector<shared_ptr<AsymmetricCiphertext>> Sensor::look_up(vector<int> vec_p, shared_ptr<Template_enc> T_enc) {
 	vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc;
 
-	vector<vector<shared_ptr<AsymmetricCiphertext>>> T = T_enc->T_enc;
-
-	for(int i=0; i<T.size(); i++) {
+	for(int i=0; i<T_enc->size().first; i++) {
 		/*vector<shared_ptr<AsymmetricCiphertext>> vec_col_enc = T[i];
 		shared_ptr<AsymmetricCiphertext> s = vec_col_enc[vec_p[i]];*/
-		shared_ptr<AsymmetricCiphertext> s = T_enc.get(i, vec_p[i]);
+		shared_ptr<AsymmetricCiphertext> s = T_enc->get_elem(i, vec_p[i]);
 
 		vec_s_enc.push_back(s);
 	}
@@ -286,8 +311,8 @@ shared_ptr<GroupElement> Sensor::check_key(vector<shared_ptr<GroupElement>> vec_
 
 	auto result = dlog->exponentiate(g.get(), 0); //initiate result with g^0 = 1
 
-	for(shared_ptr<GroupElement> B_i : vec_B) {
-		vector<unsigned char> B_i_bytes = dlog->decodeGroupElementToByteArray(B_i.get());
+	for(int i=0; i<vec_B.size(); i++) {
+		vector<unsigned char> B_i_bytes = dlog->decodeGroupElementToByteArray(vec_B[i].get());
 		pad(B_i_bytes, 128);
 
 		SecretKey aes_B_i_sk = SecretKey(B_i_bytes, "");
@@ -297,10 +322,10 @@ shared_ptr<GroupElement> Sensor::check_key(vector<shared_ptr<GroupElement>> vec_
 		biginteger decryption_int = byte_to_int(((ByteArrayPlaintext *)decryption.get())->getText());
 
 		cout << "decryption_int: " << decryption_int << endl;
-		cout << "B_i: " << ((OpenSSLZpSafePrimeElement *)B_i.get())->getElementValue() << endl;
+		cout << "B_" << i << ": " << ((OpenSSLZpSafePrimeElement *)vec_B[i].get())->getElementValue() << endl;
 
 		if(decryption_int == 1) {
-			result = B_i;
+			result = vec_B[i];
 			break;
 		}
 	}
@@ -333,14 +358,29 @@ shared_ptr<AsymmetricCiphertext> Sensor::add_scores(vector<shared_ptr<Asymmetric
 vector<shared_ptr<GroupElement>> Sensor::decrypt_vec_B_enc2(vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc2) {
 	vector<shared_ptr<GroupElement>> vec_B;
 
-	for(shared_ptr<AsymmetricCiphertext> B_i_enc2 : vec_B_enc2) {
-		shared_ptr<Plaintext> plaintext = elgamal->decrypt(B_i_enc2.get());
+	for(int i=0; i<vec_B_enc2.size(); i++) {
+		shared_ptr<Plaintext> plaintext = elgamal->decrypt(vec_B_enc2[i].get());
 		shared_ptr<GroupElement> B_i = ((GroupElementPlaintext*)plaintext.get())->getElement();
 		vec_B.push_back(B_i);
-		cout << "B_i: " << ((OpenSSLZpSafePrimeElement *)B_i.get())->getElementValue() << endl;
+		cout << "B_" << i << ": " << ((OpenSSLZpSafePrimeElement *)B_i.get())->getElementValue() << endl;
 	}
 
 	return vec_B;
+}
+
+void Sensor::test_k_enc2(shared_ptr<AsymmetricCiphertext> k_enc) {
+	shared_ptr<Plaintext> plaintext = elgamal->decrypt(k_enc.get());
+	cout << "decrypted [k]: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)plaintext.get())->getElement()).get())->getElementValue() << endl;
+}
+
+shared_ptr<AsymmetricCiphertext> Sensor::test_S_enc(biginteger S) {
+	auto g = dlog->getGenerator();
+	auto g_S = dlog->exponentiate(g.get(), S);
+
+  GroupElementPlaintext p1(g_S);
+	shared_ptr<AsymmetricCiphertext> cipher = elgamal->encrypt(make_shared<GroupElementPlaintext>(p1));
+
+	return cipher;
 }
 
 void Sensor::test_look_up() {

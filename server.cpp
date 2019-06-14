@@ -34,7 +34,7 @@ void Server::key_setup(shared_ptr<PublicKey> pk_ss) {
 	shared_ptr<GroupElement> h_shared = dlog->exponentiate(((ElGamalPublicKey*) pk_ss.get())->getH().get(), ((ElGamalPrivateKey*) sk_sv.get())->getX());
 
 	cout << "h_shared for server: " << ((OpenSSLZpSafePrimeElement *)h_shared.get())->getElementValue() << endl;
-	shared_ptr<PublicKey> pk_shared = make_shared<ElGamalPublicKey>(ElGamalPublicKey(h_shared));
+	pk_shared = make_shared<ElGamalPublicKey>(ElGamalPublicKey(h_shared));
 
 	elgamal->setKey(pk_shared);
 }
@@ -50,11 +50,14 @@ void Server::store_table(tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<As
 }
 
 shared_ptr<Template_enc> Server::fetch_template(int u) {
+	cout << "size of table: " << table.size() << endl;
 	return table.get_T_enc(u);
 }
 
-vector<shared_ptr<AsymmetricCiphertext>> Server::compare(shared_ptr<AsymmetricCiphertext> cap_s_enc, biginteger t, biginteger max_S) {
+vector<shared_ptr<AsymmetricCiphertext>> Server::compare(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S) {
 	vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc;
+
+	elgamal->setKey(pk_shared);
 
 	auto g = dlog->getGenerator();
 	auto g_t = dlog->exponentiate(g.get(), t);
@@ -72,12 +75,13 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::compare(shared_ptr<AsymmetricCi
 		//first compute and encrypt g^-i
 		auto g_i = dlog->exponentiate(g.get(), i);
 		shared_ptr<GroupElement> g_min_i = dlog->getInverse(g_i.get());
+
 		//cout << "g^-i: " << ((OpenSSLZpSafePrimeElement *)g_min_i.get())->getElementValue() << endl;
 		GroupElementPlaintext p_g_min_i(g_min_i);
 	  shared_ptr<AsymmetricCiphertext> c_g_min_i = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_min_i));
 
 		//multiply g^S * g^-t * g^-i = g^(S-t-i)
-		shared_ptr<AsymmetricCiphertext> result = elgamal->multiply(cap_s_enc.get(), c_g_min_t.get());
+		shared_ptr<AsymmetricCiphertext> result = elgamal->multiply(S_enc.get(), c_g_min_t.get());
 		result = elgamal->multiply(result.get(), c_g_min_i.get());
 
 		//save result in C_enc
@@ -118,11 +122,11 @@ pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> Server::
 	return table.get_key_pair(u);
 }
 
-vector<shared_ptr<AsymmetricCiphertext>> Server::potential_keys(vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc2, shared_ptr<AsymmetricCiphertext> cap_k_enc2) {
+vector<shared_ptr<AsymmetricCiphertext>> Server::potential_keys(vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc2, shared_ptr<AsymmetricCiphertext> K_enc2) {
 	vector<shared_ptr<AsymmetricCiphertext>> B_enc2;
 
 	for(shared_ptr<AsymmetricCiphertext> C_i_enc2 : vec_C_enc2) {
-		shared_ptr<AsymmetricCiphertext> B_i_enc2 = elgamal->multiply(C_i_enc2.get(), cap_k_enc2.get());
+		shared_ptr<AsymmetricCiphertext> B_i_enc2 = elgamal->multiply(C_i_enc2.get(), K_enc2.get());
 		B_enc2.push_back(B_i_enc2);
 	}
 
@@ -166,13 +170,13 @@ void Server::test_compare(biginteger t, biginteger max_S) {
 	for(int i=0; i<max_S; i++) {
 		cout << "S: " << i << endl;
 
-		biginteger cap_s = i;
+		biginteger S = i;
 
-		auto g_cap_s = dlog->exponentiate(g.get(), cap_s);
-		GroupElementPlaintext p_g_cap_s(g_cap_s);
-		shared_ptr<AsymmetricCiphertext> c_g_cap_s = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_cap_s));
+		auto g_S = dlog->exponentiate(g.get(), S);
+		GroupElementPlaintext p_g_S(g_S);
+		shared_ptr<AsymmetricCiphertext> c_g_S = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_S));
 
-		vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc = compare(c_g_cap_s, t, max_S);
+		vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc = compare(c_g_S, t, max_S);
 
 		//test if there's a C_i that equals 1 when decrypted
 		for(shared_ptr<AsymmetricCiphertext> C_i_enc : vec_C_enc) {
@@ -185,14 +189,14 @@ void Server::test_compare(biginteger t, biginteger max_S) {
 }
 
 //Permute order of comparison vector
-void Server::test_permute(biginteger cap_s, biginteger t, biginteger max_s) {
+void Server::test_permute(biginteger S, biginteger t, biginteger max_s) {
 	auto g = dlog->getGenerator();
 
-	auto g_cap_s = dlog->exponentiate(g.get(), cap_s);
-	GroupElementPlaintext p_g_cap_s(g_cap_s);
-	shared_ptr<AsymmetricCiphertext> c_g_cap_s = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_cap_s));
+	auto g_S = dlog->exponentiate(g.get(), S);
+	GroupElementPlaintext p_g_S(g_S);
+	shared_ptr<AsymmetricCiphertext> c_g_S = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_S));
 
-	vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc = compare(c_g_cap_s, t, max_s);
+	vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc = compare(c_g_S, t, max_s);
 
 	//print all C_i
 	for(shared_ptr<AsymmetricCiphertext> C_i_enc : vec_C_enc) {
