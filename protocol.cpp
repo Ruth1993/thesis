@@ -43,18 +43,14 @@ int main() {
 
 	vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc = sv.compare(S_enc, t, max_S);
 	vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc_prime = sv.permute(vec_C_enc);
-	vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc2 = sv.D1(vec_C_enc); //TODO change to vec_C_prime
 	pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> key_pair = sv.fetch_key_pair(u_vec_p.first);
-
-	vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc2 = sv.potential_keys(vec_C_enc2, key_pair.first);
+	vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc = sv.potential_keys(vec_C_enc, key_pair.first); //TODO change to vec_C_prime
+	vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc2 = sv.D1(vec_B_enc);
 
 	ss.test_k_enc2(key_pair.first);
 
-	cout << "vec_C: " << endl;
-	vector<shared_ptr<GroupElement>> vec_C = ss.decrypt_vec_B_enc2(vec_C_enc2);
-
 	cout << "vec_B: " << endl;
-	vector<shared_ptr<GroupElement>> vec_B = ss.decrypt_vec_B_enc2(vec_B_enc2); //TODO change to vec_B_enc2
+	vector<shared_ptr<GroupElement>> vec_B = ss.decrypt_vec_B_enc2(vec_B_enc2); 
 	shared_ptr<GroupElement> key = ss.check_key(vec_B, key_pair.second);
 
 	cout << "Key: " << ((OpenSSLZpSafePrimeElement *)key.get())->getElementValue() << endl;

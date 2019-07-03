@@ -236,8 +236,6 @@ tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shar
 		result = dlog->multiplyGroupElements(result.get(), vec_s[i].get());
 	}
 
-	cout << "result of manual addition is:       " << ((OpenSSLZpSafePrimeElement *)result.get())->getElementValue() << endl;
-
 	//Step 3 Encrypte template T
 	shared_ptr<Template_enc> T_enc = encrypt_template(T);
 
@@ -248,14 +246,13 @@ tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shar
 	biginteger k = getRandomInRange(0, p-1, gen.get()); //generate random k
 
 	//K = g^k
-	auto K = dlog->exponentiate(g.get(), k);
-	cout << "[k]:       " << ((OpenSSLZpSafePrimeElement *)K.get())->getElementValue() << endl;
+	auto K = dlog->exponentiate(g.get(), k); //TODO change 2 back to k
+	//cout << "[k]:       " << ((OpenSSLZpSafePrimeElement *)K.get())->getElementValue() << endl;
 
-	//Step 5: encrypt K, but first set pk to pk_ss
-	elgamal->setKey(pk_ss);
+	//Step 5: encrypt K, but first set pk to pk_shared
+	elgamal->setKey(pk_shared);
 	GroupElementPlaintext p_K(K);
 	shared_ptr<AsymmetricCiphertext> K_enc = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_K));
-	elgamal->setKey(pk_shared);
 
 	//Step 6: AES_K(1)
 	//First copy K to byte vector in order to use in AES encryption
