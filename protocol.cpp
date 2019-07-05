@@ -26,6 +26,7 @@ int main() {
 
 	int u = 1;
 
+	cout << "test" << endl;
 
 	tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enrollment = ss.enroll(u, template_size, min_s, max_s);
 
@@ -50,7 +51,7 @@ int main() {
 	ss.test_k_enc2(key_pair.first);
 
 	cout << "vec_B: " << endl;
-	vector<shared_ptr<GroupElement>> vec_B = ss.decrypt_vec_B_enc2(vec_B_enc2); 
+	vector<shared_ptr<GroupElement>> vec_B = ss.decrypt_vec_B_enc2(vec_B_enc2);
 	shared_ptr<GroupElement> key = ss.check_key(vec_B, key_pair.second);
 
 	cout << "Key: " << ((OpenSSLZpSafePrimeElement *)key.get())->getElementValue() << endl;
