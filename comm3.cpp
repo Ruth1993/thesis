@@ -1,4 +1,4 @@
-#include <libscapi/include/comm/Comm.hpp>
+#include "../libscapi/include/comm/Comm.hpp"
 
 int main(int argc, char* argv[]) {
 

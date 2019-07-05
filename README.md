@@ -3,10 +3,15 @@ This is the code for my master thesis. It's still work in progress, so when you 
 
 Install instructions:
 - Download this folder
-- Install libscapi as on: https://github.com/cryptobiu/libscapi/blob/master/build_scripts/INSTALL.md. Make sure you install OpenSSL 1.0.x, instead of newer versions. The code has been tested and found working on Ubuntu 16.04 with OpenSSL 1.0.2g.
+- Install libscapi as on: https://github.com/cryptobiu/libscapi/blob/master/build_scripts/INSTALL.md.
+- To check if the installation was succesfull, build and run the tests as on:
+
+
+The code has been tested and found working on Ubuntu 16.04 with OpenSSL 1.0.2g.
+
 
 Compile:
- - g++ protocol.cpp server.cpp sensor.cpp table.cpp template.cpp -I/home/osboxes -I/home/osboxes/boost_1_64_0 -std=c++14 ../libscapi/libscapi.a -lboost_system -L/home/osboxes/boost_1_64_0/stage/lib -lssl -lcrypto -lgmp
+ - g++ protocol.cpp server.cpp sensor.cpp table.cpp template.cpp -I/home/osboxes -std=c++14 ../libscapi/libscapi.a -ldl -lboost_log -lboost_system -lboost_thread -lboost_serialization -lboost_filesystem  -lssl -lcrypto -lgmp -lpthread
 
 Run:
 - ./a.out
