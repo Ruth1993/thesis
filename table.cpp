@@ -64,7 +64,6 @@ void Table::remove_entry(int u) {
   }
 }
 
-
 /*
 * Print table size
 */

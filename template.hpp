@@ -26,6 +26,8 @@ public:
 
   int get_k();
 
+  vector<biginteger> get_col(int i);
+
   biginteger get(int i, int j);
 
   void print();

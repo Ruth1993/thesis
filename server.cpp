@@ -39,7 +39,6 @@ shared_ptr<PublicKey> Server::key_gen() {
 void Server::key_setup(shared_ptr<PublicKey> pk_ss) {
 	shared_ptr<GroupElement> h_shared = dlog->exponentiate(((ElGamalPublicKey*) pk_ss.get())->getH().get(), ((ElGamalPrivateKey*) sk_sv.get())->getX());
 
-	cout << "h_shared for server: " << ((OpenSSLZpSafePrimeElement *)h_shared.get())->getElementValue() << endl;
 	pk_shared = make_shared<ElGamalPublicKey>(ElGamalPublicKey(h_shared));
 
 	elgamal->setKey(pk_shared);
@@ -57,7 +56,6 @@ void Server::store_table(tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<As
 *		Fetch template from table
 */
 shared_ptr<Template_enc> Server::fetch_template(int u) {
-	cout << "size of table: " << table.size() << endl;
 	return table.get_T_enc(u);
 }
 
@@ -111,26 +109,6 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::permute(vector<shared_ptr<Asymm
 	return vec_C_enc;
 }
 
-
-//Perform decryption step D1
-/*vector<shared_ptr<AsymmetricCiphertext>> Server::D1(vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc) {
-	vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc2;
-
-	for(shared_ptr<AsymmetricCiphertext> C_i_enc : vec_C_enc) {
-		//((ElGamalPublicKey*) pk_ss.get())->getH().get()
-		//((ElGamalOnGroupElementCiphertext) C_i_enc.get())->getC2()
-		//shared_ptr<GroupElement> c1_prime = dlog->exponentiate(((ElGamalOnGroupElementCiphertext*) C_i_enc.get())->getC1().get(), ((ElGamalPrivateKey*) sk_sv.get())->getX());
-		//vec_C_enc2.push_back(ElGamalOnGroupElementCiphertext(c1_prime, ((ElGamalOnGroupElementCiphertext*) C_i_enc.get())->getC2()));
-
-		shared_ptr<GroupElement> c1_prime = dlog->exponentiate(((ElGamalOnGroupElementCiphertext*) C_i_enc.get())->getC1().get(), ((ElGamalPrivateKey*) sk_sv.get())->getX());
-		ElGamalOnGroupElementCiphertext C_i_enc2 = ElGamalOnGroupElementCiphertext(c1_prime, ((ElGamalOnGroupElementCiphertext*) C_i_enc.get())->getC2());
-		vec_C_enc2.push_back(make_shared<ElGamalOnGroupElementCiphertext>(C_i_enc2));
-	}
-
-	return vec_C_enc2;
-}*/
-
-
 /*
 *		Fetch key pair ([[k]], AES_k(1)) corresponding to u from table
 */
@@ -145,7 +123,10 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::calc_vec_B_enc(vector<shared_pt
 	vector<shared_ptr<AsymmetricCiphertext>> B_enc2;
 
 	for(shared_ptr<AsymmetricCiphertext> C_i_enc2 : vec_C_enc2) {
+		auto start = chrono::steady_clock::now();
 		shared_ptr<AsymmetricCiphertext> B_i_enc2 = elgamal->multiply((ElGamalOnGroupElementCiphertext*) C_i_enc2.get(), (ElGamalOnGroupElementCiphertext*) K_enc2.get());
+		auto end = chrono::steady_clock::now();
+		//cout << "Time elapsed by computing [[C]]*[[k]] in us: " << chrono::duration_cast<chrono::microseconds>(end-start).count() << endl;
 		B_enc2.push_back(B_i_enc2);
 	}
 
@@ -160,11 +141,6 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::D1(vector<shared_ptr<Asymmetric
 	vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc2;
 
 	for(shared_ptr<AsymmetricCiphertext> B_i_enc : vec_B_enc) {
-		//((ElGamalPublicKey*) pk_ss.get())->getH().get()
-		//((ElGamalOnGroupElementCiphertext) C_i_enc.get())->getC2()
-		//shared_ptr<GroupElement> c1_prime = dlog->exponentiate(((ElGamalOnGroupElementCiphertext*) C_i_enc.get())->getC1().get(), ((ElGamalPrivateKey*) sk_sv.get())->getX());
-		//vec_C_enc2.push_back(ElGamalOnGroupElementCiphertext(c1_prime, ((ElGamalOnGroupElementCiphertext*) C_i_enc.get())->getC2()));
-
 		shared_ptr<GroupElement> b1_prime = dlog->exponentiate(((ElGamalOnGroupElementCiphertext*) B_i_enc.get())->getC1().get(), ((ElGamalPrivateKey*) sk_sv.get())->getX());
 		ElGamalOnGroupElementCiphertext B_i_enc2 = ElGamalOnGroupElementCiphertext(b1_prime, ((ElGamalOnGroupElementCiphertext*) B_i_enc.get())->getC2());
 		vec_B_enc2.push_back(make_shared<ElGamalOnGroupElementCiphertext>(B_i_enc2));
@@ -174,7 +150,7 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::D1(vector<shared_ptr<Asymmetric
 }
 
 /*
-*		Print table size
+*		Return table size
 */
 int Server::size_table() {
 	return table.size();

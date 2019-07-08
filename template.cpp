@@ -62,7 +62,14 @@ int Template::get_k() {
 }
 
 /*
-*   Get element on position x,y
+*   Return column in i-th row
+*/
+vector<biginteger> Template::get_col(int i) {
+  return T[i];
+}
+
+/*
+*   Return element on position (x,y)
 */
 biginteger Template::get(int i, int j) {
   return T[i][j];
@@ -73,13 +80,16 @@ biginteger Template::get(int i, int j) {
 */
 void Template::print() {
   cout << "Template: { ";
+
   for(vector<biginteger> vec_col : T) {
     cout << "{";
-    for(biginteger s : vec_col) {
-        cout << s << ",";
+
+    for(int j=0; j<vec_col.size()-1; j++) {
+      biginteger s = vec_col[j];
+      cout << s << ",";
     }
 
-    cout << "}, ";
+    cout << vec_col[vec_col.size()-1] << "}, ";
   }
 
   cout << " }" << endl;
@@ -106,7 +116,7 @@ pair<int, int> Template_enc::size() {
 }
 
 /*
-*   Get element on position x,y
+*   Get element on position (x,y)
 */
 shared_ptr<AsymmetricCiphertext> Template_enc::get_elem(int i, int j) {
   return T_enc[i][j];

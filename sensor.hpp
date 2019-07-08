@@ -58,8 +58,6 @@ public:
 
 	shared_ptr<GroupElement> check_key(vector<shared_ptr<GroupElement>> vec_B, shared_ptr<SymmetricCiphertext> aes_K);
 
-	void test_k_enc2(shared_ptr<AsymmetricCiphertext> k_enc);
-
 	shared_ptr<AsymmetricCiphertext> test_S_enc(biginteger S);
 
 	void test_look_up();
