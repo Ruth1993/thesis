@@ -26,8 +26,6 @@ int main() {
 
 	int u = 1;
 
-	cout << "test" << endl;
-
 	tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enrollment = ss.enroll(u, template_size, min_s, max_s);
 
 	sv.store_table(enrollment);
@@ -45,7 +43,7 @@ int main() {
 	vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc = sv.compare(S_enc, t, max_S);
 	vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc_prime = sv.permute(vec_C_enc);
 	pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> key_pair = sv.fetch_key_pair(u_vec_p.first);
-	vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc = sv.potential_keys(vec_C_enc, key_pair.first); //TODO change to vec_C_prime
+	vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc = sv.calc_vec_B_enc(vec_C_enc, key_pair.first); //TODO change to vec_C_prime
 	vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc2 = sv.D1(vec_B_enc);
 
 	ss.test_k_enc2(key_pair.first);
@@ -56,7 +54,7 @@ int main() {
 
 	cout << "Key: " << ((OpenSSLZpSafePrimeElement *)key.get())->getElementValue() << endl;
 
-	ss.print_outcomes();
+	ss.print_outcomes(template_size.first * max_s);
 
 	return 0;
 }

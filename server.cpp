@@ -19,6 +19,9 @@ Server::Server(shared_ptr<OpenSSLDlogZpSafePrime> dlogg) {
 	biginteger q = dlog->getOrder();
 }
 
+/*
+*		Generate ElGamal key pair
+*/
 shared_ptr<PublicKey> Server::key_gen() {
 	auto pair = elgamal->generateKey();
 
@@ -30,6 +33,9 @@ shared_ptr<PublicKey> Server::key_gen() {
 	return pk_sv;
 }
 
+/*
+*		Setup shared public key for double encryption
+*/
 void Server::key_setup(shared_ptr<PublicKey> pk_ss) {
 	shared_ptr<GroupElement> h_shared = dlog->exponentiate(((ElGamalPublicKey*) pk_ss.get())->getH().get(), ((ElGamalPrivateKey*) sk_sv.get())->getX());
 
@@ -39,21 +45,25 @@ void Server::key_setup(shared_ptr<PublicKey> pk_ss) {
 	elgamal->setKey(pk_shared);
 }
 
-shared_ptr<ElGamalOnGroupElementCiphertext> Server::test_partial_decrypt(shared_ptr<AsymmetricCiphertext> cipher) {
-	shared_ptr<GroupElement> c_1_prime = dlog->exponentiate(((ElGamalOnGroupElementCiphertext*) cipher.get())->getC1().get(), ((ElGamalPrivateKey*) sk_sv.get())->getX());
-	return make_shared<ElGamalOnGroupElementCiphertext>(ElGamalOnGroupElementCiphertext(c_1_prime, ((ElGamalOnGroupElementCiphertext*) cipher.get())->getC2()));
-}
-
-//add random table entry
+/*
+*		Store enrollment of sensor in table
+*/
 void Server::store_table(tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enrollment) {
 	table.add_entry(get<0>(enrollment), get<1>(enrollment), get<2>(enrollment).first, get<2>(enrollment).second);
 }
 
+
+/*
+*		Fetch template from table
+*/
 shared_ptr<Template_enc> Server::fetch_template(int u) {
 	cout << "size of table: " << table.size() << endl;
 	return table.get_T_enc(u);
 }
 
+/*
+*		Compare [[S]]  with threshold t resulting in [[vec_C]]
+*/
 vector<shared_ptr<AsymmetricCiphertext>> Server::compare(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S) {
 	vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc;
 
@@ -91,7 +101,9 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::compare(shared_ptr<AsymmetricCi
 	return vec_C_enc;
 }
 
-//Permute [[C]]
+/*
+*		Permute [[C]]
+*/
 vector<shared_ptr<AsymmetricCiphertext>> Server::permute(vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc) {
 	unsigned seed = chrono::system_clock::now().time_since_epoch().count();
 	shuffle(vec_C_enc.begin(), vec_C_enc.end(), default_random_engine(seed));
@@ -118,11 +130,18 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::permute(vector<shared_ptr<Asymm
 	return vec_C_enc2;
 }*/
 
+
+/*
+*		Fetch key pair ([[k]], AES_k(1)) corresponding to u from table
+*/
 pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> Server::fetch_key_pair(int u) {
 	return table.get_key_pair(u);
 }
 
-vector<shared_ptr<AsymmetricCiphertext>> Server::potential_keys(vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc2, shared_ptr<AsymmetricCiphertext> K_enc2) {
+/*
+*		Compute [[vec_B]] by multipling [{C}] and [[k]] element-wise
+*/
+vector<shared_ptr<AsymmetricCiphertext>> Server::calc_vec_B_enc(vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc2, shared_ptr<AsymmetricCiphertext> K_enc2) {
 	vector<shared_ptr<AsymmetricCiphertext>> B_enc2;
 
 	for(shared_ptr<AsymmetricCiphertext> C_i_enc2 : vec_C_enc2) {
@@ -133,6 +152,10 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::potential_keys(vector<shared_pt
 	return B_enc2;
 }
 
+/*
+*		Partial decryption step
+* 	[[vec_B]] is partially decrypted to [vec_B]
+*/
 vector<shared_ptr<AsymmetricCiphertext>> Server::D1(vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc) {
 	vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc2;
 
@@ -150,11 +173,17 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::D1(vector<shared_ptr<Asymmetric
 	return vec_B_enc2;
 }
 
+/*
+*		Print table size
+*/
 int Server::size_table() {
 	return table.size();
 }
 
-void Server::test_potential_keys() {
+/*
+*		Test function calc_vec_B_enc
+*/
+void Server::test_calc_vec_B_enc() {
 	auto g = dlog->getGenerator();
 
 	vector<shared_ptr<AsymmetricCiphertext>> vec;
@@ -172,12 +201,14 @@ void Server::test_potential_keys() {
 	GroupElementPlaintext p2(K);
 	shared_ptr<AsymmetricCiphertext> cipher2 = elgamal->encrypt(make_shared<GroupElementPlaintext>(p2));
 
-	vector<shared_ptr<AsymmetricCiphertext>> keys = potential_keys(vec, cipher2);
+	vector<shared_ptr<AsymmetricCiphertext>> keys = calc_vec_B_enc(vec, cipher2);
 
 	cout << "size of [B]: " << keys.size() << endl;
 }
 
-//Compare S with threshold t
+/*
+*		Test function compare
+*/
 void Server::test_compare(biginteger t, biginteger max_S) {
 	auto g = dlog->getGenerator();
 
@@ -205,7 +236,9 @@ void Server::test_compare(biginteger t, biginteger max_S) {
 	}
 }
 
-//Permute order of comparison vector
+/*
+*		Test function permute
+*/
 void Server::test_permute(biginteger S, biginteger t, biginteger max_s) {
 	auto g = dlog->getGenerator();
 
@@ -230,6 +263,14 @@ void Server::test_permute(biginteger S, biginteger t, biginteger max_s) {
 		shared_ptr<Plaintext> C_i_prime = elgamal->decrypt(C_i_enc_prime.get());
 		cout << "C_i': " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)C_i_prime.get())->getElement()).get())->getElementValue() << endl;
 	}
+}
+
+/*
+*		Test function D1
+*/
+shared_ptr<ElGamalOnGroupElementCiphertext> Server::test_D1(shared_ptr<AsymmetricCiphertext> cipher) {
+	shared_ptr<GroupElement> c_1_prime = dlog->exponentiate(((ElGamalOnGroupElementCiphertext*) cipher.get())->getC1().get(), ((ElGamalPrivateKey*) sk_sv.get())->getX());
+	return make_shared<ElGamalOnGroupElementCiphertext>(ElGamalOnGroupElementCiphertext(c_1_prime, ((ElGamalOnGroupElementCiphertext*) cipher.get())->getC2()));
 }
 
 int main_sv() {
