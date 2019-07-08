@@ -1,36 +1,112 @@
-//Committer
-#include "../libscapi/include/comm/Comm.hpp"
+/**
+* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+*
+* Copyright (c) 2016 LIBSCAPI (http://crypto.biu.ac.il/SCAPI)
+* This file is part of the SCAPI project.
+* DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+*
+* Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
+* to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+* and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+*
+* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+* FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+* WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*
+* We request that any publication and/or code referring to and/or based on SCAPI contain an appropriate citation to SCAPI, including a reference to
+* http://crypto.biu.ac.il/SCAPI.
+*
+* Libscapi uses several open source libraries. Please see these projects for any further licensing issues.
+* For more information , See https://github.com/cryptobiu/libscapi/blob/master/LICENSE.MD
+*
+* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+*
+*/
 
-shared_ptr<CmtCommitter> getCommitter(shared_ptr<CommParty> channel) {
-  auto dlog = make_shared<OpenSSLDlogECF2m>();
-  shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog);
 
-  return committer;
+#include "commitment_example.hpp"
+
+CommitmentParams readCommitmentConfig(string config_file) {
+	ConfigFile cf(config_file);
+	string proverIpStr = cf.Value("", "proverIp");
+	string verifierIpStr = cf.Value("", "verifierIp");
+	int proverPort = stoi(cf.Value("", "proverPort"));
+	int verifierPort = stoi(cf.Value("", "verifierPort"));
+	auto proverIp = IpAddress::from_string(proverIpStr);
+	auto verifierIp = IpAddress::from_string(verifierIpStr);
+	string protocolName = cf.Value("", "protocolName");
+	return CommitmentParams(proverIp, verifierIp, proverPort, verifierPort, protocolName);
+};
+
+shared_ptr<CmtCommitter> get_committer(shared_ptr<CommParty> channel) {
+	auto dlog = make_shared<OpenSSLDlogECF2m>();
+	shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog);
+
+	return committer;
 }
 
 shared_ptr<CmtReceiver> getReceiver(shared_ptr<CommParty> channel) {
-  auto dlog = make_shared<OpenSSLDlogECF2m>();
-  shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog);
+	auto dlog = make_shared<OpenSSLDlogECF2m>();
+	shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog);
 
-  return committer;
+	return receiver;
 }
 
-int main(int argc, char* argv[]) {
-      boost::asio::io_service io_service;
-      SocketPartyData sensor, server;
-      if (atoi(argv[1]) == 0){
-              sensor = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8000);
-              server = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8001);
-      } else {
-              sensor = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8001);
-              server = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8000);
-      }
+int main(string side, string configPath) {
+	auto sdp = readCommitmentConfig(configPath);
+	boost::asio::io_service io_service;
+	SocketPartyData server(boost_ip::address::from_string("127.0.0.1"), 8000);
+	SocketPartyData sensor(boost_ip::address::from_string("127.0.0.1"), 8001);
+	shared_ptr<CommParty> channel = (side == "1") ?
+		make_shared<CommPartyTCPSynced>(io_service, server, sensor) :
+		make_shared<CommPartyTCPSynced>(io_service, sensor, server);
+	boost::thread t(boost::bind(&boost::asio::io_service::run, &io_service));
 
-      shared_ptr<CommParty> channel = make_shared<CommPartyTCPSynced>(io_service, sensor, server);
-      // connect to party one
-      try {
-        channel->join(500, 5000);
-        cout<<"channel established"<<endl;
-      }
+	try {
+		if (side == "1") {
+			server->join(500, 5000); // sleep time=500, timeout = 5000 (ms);
+			auto committer = getCommitter(server, sdp);
+			auto val = committer->sampleRandomCommitValue();
+			cout << "the committed value is:" << val->toString() << endl;
+			committer->commit(val, 0);
+			committer->decommit(0);
+			if (sdp.protocolName.find("WithProofs") != string::npos) {
+				auto prover = dynamic_pointer_cast<CmtWithProofsCommitter>(committer);
+				prover->proveKnowledge(0);
+				prover->proveCommittedValue(0);
+			}
+		}
+		else if (side == "2") {
+			server->join(500, 5000); // sleep time=500, timeout = 5000 (ms);
+			auto receiver = getReceiver(server, sdp);
+			auto commitment = receiver->receiveCommitment();
+			auto result = receiver->receiveDecommitment(0);
+			if (result == NULL) {
+				cout << "commitment failed" << endl;
+			} else
+				cout << "the committed value is:" << result->toString() << endl;;
 
+
+			if (sdp.protocolName.find("WithProofs") != string::npos) {
+				auto verifier = dynamic_pointer_cast<CmtWithProofsReceiver>(receiver);
+				bool verified = verifier->verifyKnowledge(0);
+				cout << "knowledge verifer output: " << (verified ? "Success" : "Failure") << endl;
+				cout << "verified committed value: " << verifier->verifyCommittedValue(0)->toString() << endl;
+			}
+		}
+		else {
+			CommitmentUsage();
+			return 1;
+		}
+	}
+	catch (const logic_error& e) {
+		// Log error message in the exception object
+		cerr << e.what();
+	}
+	io_service.stop();
+	t.join();
+
+	return 0;
 }
