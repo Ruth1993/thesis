@@ -28,6 +28,9 @@
 
 
 #include "CommitmentExample.hpp"
+#include <stdlib.h>
+
+using namespace std;
 
 CommitmentParams readCommitmentConfig(string config_file) {
 	ConfigFile cf(config_file);
@@ -114,46 +117,38 @@ shared_ptr<CmtReceiver> getReceiver(shared_ptr<CommParty> channel, CommitmentPar
 	return sds;
 }
 
-int main(string side, string configPath) {
+int main(int argc, char* argv[]) {
+	char *p;
+	int side = strtol(argv[1], &p, 10);
+	string configPath = argv[2];
+
 	auto sdp = readCommitmentConfig(configPath);
 	boost::asio::io_service io_service;
 	SocketPartyData committerParty(sdp.committerIp, sdp.committerPort);
 	SocketPartyData receiverParty(sdp.receiverIp, sdp.receiverPort);
-	shared_ptr<CommParty> server = (side == "1") ?
+	shared_ptr<CommParty> server = (side == 1) ?
 		make_shared<CommPartyTCPSynced>(io_service, committerParty, receiverParty) :
 		make_shared<CommPartyTCPSynced>(io_service, receiverParty, committerParty);
 	boost::thread t(boost::bind(&boost::asio::io_service::run, &io_service));
 
 	try {
-		if (side == "1") {
+		if (side == 1) {
 			server->join(500, 5000); // sleep time=500, timeout = 5000 (ms);
 			auto committer = getCommitter(server, sdp);
 			auto val = committer->sampleRandomCommitValue();
 			cout << "the committed value is:" << val->toString() << endl;
 			committer->commit(val, 0);
 			committer->decommit(0);
-			if (sdp.protocolName.find("WithProofs") != string::npos) {
-				auto prover = dynamic_pointer_cast<CmtWithProofsCommitter>(committer);
-				prover->proveKnowledge(0);
-				prover->proveCommittedValue(0);
-			}
 		}
-		else if (side == "2") {
+		else if (side == 2) {
 			server->join(500, 5000); // sleep time=500, timeout = 5000 (ms);
 			auto receiver = getReceiver(server, sdp);
 			auto commitment = receiver->receiveCommitment();
 			auto result = receiver->receiveDecommitment(0);
 			if (result == NULL) {
 				cout << "commitment failed" << endl;
-			} else
-				cout << "the committed value is:" << result->toString() << endl;;
-
-
-			if (sdp.protocolName.find("WithProofs") != string::npos) {
-				auto verifier = dynamic_pointer_cast<CmtWithProofsReceiver>(receiver);
-				bool verified = verifier->verifyKnowledge(0);
-				cout << "knowledge verifer output: " << (verified ? "Success" : "Failure") << endl;
-				cout << "verified committed value: " << verifier->verifyCommittedValue(0)->toString() << endl;
+			} else {
+				cout << "the committed value is:" << result->toString() << endl;
 			}
 		}
 		else {
@@ -167,6 +162,6 @@ int main(string side, string configPath) {
 	}
 	io_service.stop();
 	t.join();
-	
+
 	return 0;
 }
