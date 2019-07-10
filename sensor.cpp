@@ -221,10 +221,15 @@ vector<shared_ptr<AsymmetricCiphertext>> Sensor::look_up(vector<int> vec_p, shar
 *		Add up all scores contained in [[vec_s]]
 */
 shared_ptr<AsymmetricCiphertext> Sensor::add_scores(vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc) {
-	//%TODO add 0 for randomization
-	shared_ptr<AsymmetricCiphertext> result = vec_s_enc[0];
+	//first add 0 (g^0) for randomization
+	auto g = dlog->getGenerator();
+	auto id = dlog->exponentiate(g.get(), 0);
+	GroupElementPlaintext p_id(id);
+	shared_ptr<AsymmetricCiphertext> c_id = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_id));
 
-	for(int i=1; i<vec_s_enc.size(); i++) {
+	shared_ptr<AsymmetricCiphertext> result = c_id;
+
+	for(int i=0; i<vec_s_enc.size(); i++) {
 		result = elgamal->multiply(result.get(), vec_s_enc[i].get());
 	}
 
