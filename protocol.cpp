@@ -26,7 +26,7 @@ int main() {
 	ss.key_setup(pk_sv);
 	auto end_key = chrono::steady_clock::now();
 
-	//cout << "Time elapsed key setup in us: " << chrono::duration_cast<chrono::microseconds>(end_key-start_key).count() << endl;
+	cout << "Time elapsed key setup in us: " << chrono::duration_cast<chrono::microseconds>(end_key-start_key).count() << endl;
 
 	cout << endl << "Enrollment procedure: " << endl;
 
@@ -38,7 +38,7 @@ int main() {
 	sv.store_table(enrollment);
 	auto end_enroll = chrono::steady_clock::now();
 
-	//cout << "Time elapsed enrollment procedure in us: " << chrono::duration_cast<chrono::microseconds>(end_enroll-start_enroll).count() << endl;
+	cout << "Time elapsed enrollment procedure in us: " << chrono::duration_cast<chrono::microseconds>(end_enroll-start_enroll).count() << endl;
 
 	cout << endl << "Verification protocol: " << endl;
 
@@ -48,15 +48,12 @@ int main() {
 	shared_ptr<Template_enc> T_enc = sv.fetch_template(u);
 
 	vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc = ss.look_up(u_vec_p.second, T_enc);
-
 	shared_ptr<AsymmetricCiphertext> S_enc = ss.add_scores(vec_s_enc);
-
-	//shared_ptr<AsymmetricCiphertext> S_enc = ss.test_S_enc(16);
 
 	vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc = sv.compare(S_enc, t, max_S);
 	vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc_prime = sv.permute(vec_C_enc);
 	pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> key_pair = sv.fetch_key_pair(u_vec_p.first);
-	vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc = sv.calc_vec_B_enc(vec_C_enc, key_pair.first); //TODO change to vec_C_prime
+	vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc = sv.calc_vec_B_enc(vec_C_enc_prime, key_pair.first); //TODO change to vec_C_prime
 	vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc2 = sv.D1(vec_B_enc);
 
 	vector<shared_ptr<GroupElement>> vec_B = ss.decrypt_vec_B_enc2(vec_B_enc2);
@@ -65,7 +62,7 @@ int main() {
 
 	cout << "Key: " << ((OpenSSLZpSafePrimeElement *)key.get())->getElementValue() << endl;
 
-	//cout << "Time elapsed verification protocol in us: " << chrono::duration_cast<chrono::microseconds>(end_protocol-start_protocol).count() << endl;
+	cout << "Time elapsed verification protocol in us: " << chrono::duration_cast<chrono::microseconds>(end_protocol-start_protocol).count() << endl;
 
 	//ss.print_outcomes(template_size.first * max_s);
 

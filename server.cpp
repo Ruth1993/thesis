@@ -68,6 +68,8 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::compare(shared_ptr<AsymmetricCi
 	elgamal->setKey(pk_shared);
 
 	auto g = dlog->getGenerator();
+	biginteger q = dlog->getOrder();
+
 	auto g_t = dlog->exponentiate(g.get(), t);
 
 	//first compute and encrypt g^-t
@@ -78,9 +80,19 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::compare(shared_ptr<AsymmetricCi
 	//cout << "g^-t: " << ((OpenSSLZpSafePrimeElement *)g_min_t.get())->getElementValue() << endl;
 
 	for(biginteger i=0; i<=max_S-t; i++) {
-		//cout << "i: " << i << endl;
+		//first compute t+i
+		biginteger t_plus_i = t+i;
 
-		//first compute and encrypt g^-i
+		//compute g^-(t+i) = g^(-t-i) and encrypt
+		auto g_t_plus_i = dlog->exponentiate(g.get(), t_plus_i);
+		shared_ptr<GroupElement> g_min_t_plus_i = dlog->getInverse(g_t_plus_i.get());
+		GroupElementPlaintext p_g_min_t_plus_i(g_min_t_plus_i);
+		shared_ptr<AsymmetricCiphertext> c_g_min_t_plus_i = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_min_t_plus_i));
+
+		//multiply [[g^S]] * [[g^(t-i)]] = [[g^(S-t-i)]]
+		shared_ptr<AsymmetricCiphertext> result = elgamal->multiply(S_enc.get(), c_g_min_t_plus_i.get());
+
+		/*//first compute and encrypt g^-i
 		auto g_i = dlog->exponentiate(g.get(), i);
 		shared_ptr<GroupElement> g_min_i = dlog->getInverse(g_i.get());
 
@@ -90,7 +102,14 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::compare(shared_ptr<AsymmetricCi
 
 		//multiply g^S * g^-t * g^-i = g^(S-t-i)
 		shared_ptr<AsymmetricCiphertext> result = elgamal->multiply(S_enc.get(), c_g_min_t.get());
-		result = elgamal->multiply(result.get(), c_g_min_i.get());
+		result = elgamal->multiply(result.get(), c_g_min_i.get());*/
+
+		//finally blind the result with random value r
+		/*biginteger r = getRandomInRange(0, q-1, get_seeded_prg().get());
+		auto g_r = dlog->exponentiate(g.get(), r);
+		GroupElementPlaintext p_g_r(g_r);
+		shared_ptr<AsymmetricCiphertext> c_g_r = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_r));
+		result = elgamal->multiply(result.get(), c_g_r.get());*/
 
 		//save result in C_enc
 		vec_C_enc.push_back(result);
