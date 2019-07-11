@@ -1,3 +1,7 @@
+/* 
+* Copyright (c) 2016 LIBSCAPI (http://crypto.biu.ac.il/SCAPI)
+*/
+
 #include "../libscapi/include/primitives/DlogOpenSSL.hpp"
 #include "../libscapi/include/mid_layer/ElGamalEnc.hpp"
 #include <iostream>

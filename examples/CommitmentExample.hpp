@@ -28,12 +28,12 @@
 
 #pragma once
 #include "../../libscapi/include/interactive_mid_protocols/CommitmentScheme.hpp"
-#include "../../libscapi/include//interactive_mid_protocols/CommitmentSchemePedersen.hpp"
-#include "../../libscapi/include//interactive_mid_protocols/CommitmentSchemePedersenHash.hpp"
-#include "../../libscapi/include//interactive_mid_protocols/CommitmentSchemePedersenTrapdoor.hpp"
-#include "../../libscapi/include//interactive_mid_protocols/CommitmentSchemeSimpleHash.hpp"
-#include "../../libscapi/include//interactive_mid_protocols/CommitmentSchemeElGamal.hpp"
-#include "../../libscapi/include//interactive_mid_protocols/CommitmentSchemeElGamalHash.hpp"
+#include "../../libscapi/include/interactive_mid_protocols/CommitmentSchemePedersen.hpp"
+#include "../../libscapi/include/interactive_mid_protocols/CommitmentSchemePedersenHash.hpp"
+#include "../../libscapi/include/interactive_mid_protocols/CommitmentSchemePedersenTrapdoor.hpp"
+#include "../../libscapi/include/interactive_mid_protocols/CommitmentSchemeSimpleHash.hpp"
+#include "../../libscapi/include/interactive_mid_protocols/CommitmentSchemeElGamal.hpp"
+#include "../../libscapi/include/interactive_mid_protocols/CommitmentSchemeElGamalHash.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/CommitmentSchemeEquivocal.hpp"
 
 #include <boost/thread/thread.hpp>

@@ -48,101 +48,47 @@ void CommitmentUsage() {
 	std::cerr << "Usage: ./libscapi_examples <1(=committer)|2(=receiver)> config_file_path" << std::endl;
 }
 
-shared_ptr<CmtCommitter> getCommitter(shared_ptr<CommParty> channel, CommitmentParams sdp) {
-	shared_ptr<CmtCommitter> sds;
-	if (sdp.protocolName == "Pedersen") {
-		auto dlog = make_shared<OpenSSLDlogECF2m>();
-		sds = make_shared<CmtPedersenCommitter>(channel, dlog);
-	} if (sdp.protocolName == "PedersenWithProofs") {
-		auto dlog = make_shared<OpenSSLDlogECF2m>();
-		sds = make_shared<CmtPedersenWithProofsCommitter>(channel, 80, dlog);
-	} else if (sdp.protocolName == "PedersenTrapdoor") {
-		auto dlog = make_shared<OpenSSLDlogECF2m>();
-		sds = make_shared<CmtPedersenTrapdoorCommitter>(channel, dlog);
-	} else if (sdp.protocolName == "PedersenHash") {
-		auto dlog = make_shared<OpenSSLDlogECF2m>("K-283");
-		auto hash = make_shared<OpenSSLSHA256>();
-		sds = make_shared<CmtPedersenHashCommitter>(channel, dlog, hash);
-	} else if (sdp.protocolName == "SimpleHash") {
-		sds = make_shared<CmtSimpleHashCommitter>(channel);
-	} else if (sdp.protocolName == "ElGamalOnGroupElement") {
-		auto dlog = make_shared<OpenSSLDlogECF2m>();
-		sds = make_shared<CmtElGamalOnGroupElementCommitter>(channel, dlog);
-	} else if (sdp.protocolName == "ElGamalWithProofs") {
-		auto dlog = make_shared<OpenSSLDlogECF2m>();
-		sds = make_shared<CmtElGamalWithProofsCommitter>(channel, 80, dlog);
-	} else if (sdp.protocolName == "ElGamalOnByteArray") {
-		sds = make_shared<CmtElGamalOnByteArrayCommitter>(channel);
-	} else if (sdp.protocolName == "ElGamalHash") {
-		sds = make_shared<CmtElGamalHashCommitter>(channel);
-	} else if (sdp.protocolName == "Equivocal") {
-		sds = make_shared<CmtEquivocalCommitter>(channel, 80);
-	}
+shared_ptr<CmtCommitter> getCommitter(shared_ptr<CommParty> channel) {
+	auto dlog = make_shared<OpenSSLDlogECF2m>();
+	shared_ptr<CmtCommitter> sds = make_shared<CmtPedersenCommitter>(channel, dlog);
 
 	return sds;
 }
 
-shared_ptr<CmtReceiver> getReceiver(shared_ptr<CommParty> channel, CommitmentParams sdp) {
-	shared_ptr<CmtReceiver> sds;
-	if (sdp.protocolName == "Pedersen") {
-		auto dlog = make_shared<OpenSSLDlogECF2m>();
-		sds = make_shared<CmtPedersenReceiver>(channel, dlog);
-	} if (sdp.protocolName == "PedersenWithProofs") {
-		auto dlog = make_shared<OpenSSLDlogECF2m>();
-		sds = make_shared<CmtPedersenWithProofsReceiver>(channel, 80, dlog);
-	} else if (sdp.protocolName == "PedersenTrapdoor") {
-		auto dlog = make_shared<OpenSSLDlogECF2m>();
-		sds = make_shared<CmtPedersenTrapdoorReceiver>(channel, dlog);
-	} else if (sdp.protocolName == "PedersenHash") {
-		auto dlog = make_shared<OpenSSLDlogECF2m>("K-283");
-		auto hash = make_shared<OpenSSLSHA256>();
-		sds = make_shared<CmtPedersenHashReceiver>(channel, dlog, hash);
-	} else if (sdp.protocolName == "SimpleHash") {
-		sds = make_shared<CmtSimpleHashReceiver>(channel);
-	} else if (sdp.protocolName == "ElGamalOnGroupElement") {
-		auto dlog = make_shared<OpenSSLDlogECF2m>();
-		sds = make_shared<CmtElGamalOnGroupElementReceiver>(channel, dlog);
-	} else if (sdp.protocolName == "ElGamalWithProofs") {
-		auto dlog = make_shared<OpenSSLDlogECF2m>();
-		sds = make_shared<CmtElGamalWithProofsReceiver>(channel, 80, dlog);
-	} else if (sdp.protocolName == "ElGamalOnByteArray") {
-		sds = make_shared<CmtElGamalOnByteArrayReceiver>(channel);
-	} else if (sdp.protocolName == "ElGamalHash") {
-		sds = make_shared<CmtElGamalHashReceiver>(channel);
-	} else if (sdp.protocolName == "Equivocal") {
-		sds = make_shared<CmtEquivocalReceiver>(channel, 80);
-	}
-
+shared_ptr<CmtReceiver> getReceiver(shared_ptr<CommParty> channel) {
+	auto dlog = make_shared<OpenSSLDlogECF2m>();
+	shared_ptr<CmtReceiver>	sds = make_shared<CmtPedersenReceiver>(channel, dlog);
 
 	return sds;
 }
 
 int main(int argc, char* argv[]) {
-	char *p;
-	int side = strtol(argv[1], &p, 10);
+	//char *p;
+	//int side = strtol(argv[1], &p, 10);
+	string side = argv[1];
 	string configPath = argv[2];
 
 	auto sdp = readCommitmentConfig(configPath);
 	boost::asio::io_service io_service;
 	SocketPartyData committerParty(sdp.committerIp, sdp.committerPort);
 	SocketPartyData receiverParty(sdp.receiverIp, sdp.receiverPort);
-	shared_ptr<CommParty> server = (side == 1) ?
+	shared_ptr<CommParty> server = (side == "1") ?
 		make_shared<CommPartyTCPSynced>(io_service, committerParty, receiverParty) :
 		make_shared<CommPartyTCPSynced>(io_service, receiverParty, committerParty);
 	boost::thread t(boost::bind(&boost::asio::io_service::run, &io_service));
 
 	try {
-		if (side == 1) {
+		if (side == "1") {
 			server->join(500, 5000); // sleep time=500, timeout = 5000 (ms);
-			auto committer = getCommitter(server, sdp);
+			auto committer = getCommitter(server);
 			auto val = committer->sampleRandomCommitValue();
 			cout << "the committed value is:" << val->toString() << endl;
 			committer->commit(val, 0);
 			committer->decommit(0);
 		}
-		else if (side == 2) {
+		else if (side == "2") {
 			server->join(500, 5000); // sleep time=500, timeout = 5000 (ms);
-			auto receiver = getReceiver(server, sdp);
+			auto receiver = getReceiver(server);
 			auto commitment = receiver->receiveCommitment();
 			auto result = receiver->receiveDecommitment(0);
 			if (result == NULL) {

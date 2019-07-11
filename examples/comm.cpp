@@ -27,9 +27,9 @@
 
 
 #include <boost/thread/thread.hpp>
-#include "../libscapi/include/infra/Scanner.hpp"
-#include "../libscapi/include/infra/ConfigFile.hpp"
-#include "../libscapi/include/comm/Comm.hpp"
+#include "../../libscapi/include/infra/Scanner.hpp"
+#include "../../libscapi/include/infra/ConfigFile.hpp"
+#include "../../libscapi/include/comm/Comm.hpp"
 
 
 struct CommConfig {
@@ -131,8 +131,11 @@ CommParty* getCommParty(CommConfig commConfig, string partyNumber, boost::asio::
 /*
 * Testing Communication
 */
-int main(string partyNumber, string filePath)
+int main(int argc, char* argv[])
 {
+	string partyNumber = argv[1];
+	string filePath = argv[2];
+
 	try
 	{
 		if (partyNumber != "1" && partyNumber != "2")
