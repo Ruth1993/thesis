@@ -154,11 +154,8 @@ shared_ptr<Template_enc> Sensor::encrypt_template(Template T) {
 tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> Sensor::enroll(int u, pair<int, int> template_size, int min_s, int max_s) {
 	auto g = dlog->getGenerator();
 
-	//Step 1
-	pair<int, vector<int>> u_vec_p = capture(u, template_size);
-
 	//Step 2 Construct Template_enc
-	Template T(template_size, min_s, max_s); //In real life settings T, is constructed from vec_p, but for simplicity purposes we generate it randomly
+	Template T(template_size, min_s, max_s); //In real life settings T, is constructed from a captured biometric identifier, but for simplicity purposes we generate it randomly
 	T.print();
 
 	//Step 3 Encrypt template T
@@ -197,7 +194,7 @@ tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shar
 
 	shared_ptr<SymmetricCiphertext> aes_k = aes_enc->encrypt(&p1);
 
-	return make_tuple(u_vec_p.first, T_enc, make_pair(k_enc, aes_k));
+	return make_tuple(u, T_enc, make_pair(k_enc, aes_k));
 }
 
 /*
