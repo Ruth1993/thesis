@@ -10,6 +10,10 @@
 #include "../libscapi/include/mid_layer/OpenSSLSymmetricEnc.hpp"
 #include "../libscapi/include/primitives/DlogOpenSSL.hpp"
 #include "../libscapi/include/mid_layer/ElGamalEnc.hpp"
+#include "../libscapi/include/infra/Scanner.hpp"
+#include "../libscapi/include/infra/ConfigFile.hpp"
+
+#include <boost/thread/thread.hpp>
 
 using namespace std;
 
@@ -60,6 +64,6 @@ public:
 	shared_ptr<ElGamalOnGroupElementCiphertext> test_D1(shared_ptr<AsymmetricCiphertext> cipher);
 };
 
-int main_sv();
+int main_sv(int argc, char* argv[]) ;
 
 #endif

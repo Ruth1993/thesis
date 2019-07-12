@@ -268,10 +268,6 @@ shared_ptr<ElGamalOnGroupElementCiphertext> Server::test_D1(shared_ptr<Asymmetri
 	return make_shared<ElGamalOnGroupElementCiphertext>(ElGamalOnGroupElementCiphertext(c_1_prime, ((ElGamalOnGroupElementCiphertext*) cipher.get())->getC2()));
 }
 
-int main_sv() {
-	Server sv(make_shared<OpenSSLDlogZpSafePrime>(128));
-
-	sv.test_compare(4, 10);
-
+int main_sv(int argc, char* argv[]) {
 	return 0;
 }

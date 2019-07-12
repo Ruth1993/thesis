@@ -8,6 +8,8 @@
 
 #include <boost/thread/thread.hpp>
 
+#include <vector>
+
 void print_send_message(const string  &s, int i) {
 	cout << "sending message number " << i << " message: " << s << endl;
 }
@@ -44,7 +46,12 @@ int main(int argc, char* argv[]) {
     shared_ptr<CommParty> channel = make_shared<CommPartyTCPSynced>(io_service, p2, p1);
 
     //setup ElGamal communication
-    auto dlog = make_shared<OpenSSLDlogZpSafePrime>(128);
+		//First read dlog parameters from file
+		ConfigFile cf("dlog_params.txt");
+		string p = cf.Value("", "p");
+		string g = cf.Value("", "g");
+		string q = cf.Value("", "q");
+    auto dlog = make_shared<OpenSSLDlogZpSafePrime>(q, g, p);
     ElGamalOnGroupElementEnc elgamal(dlog);
     auto pair = elgamal.generateKey();
     elgamal.setKey(pair.first, pair.second);
@@ -59,9 +66,26 @@ int main(int argc, char* argv[]) {
       string resMsgStr(reinterpret_cast<char const*>(uc), resMsg.size());
       cout << "message: " << resMsgStr << endl;
 
-      vector<byte> pk_p1;
-      channel->readWithSizeIntoVector(pk_p1);
-      shared_ptr<GroupElement> h = dlog->encodeByteArrayToGroupElement();
+			//Receive public key from party 1
+			shared_ptr<KeySendableData> pk_p1_sendable = make_shared<ElGamalPublicKeySendableData>(dlog->getGenerator()->generateSendableData());
+      vector<byte> raw_msg;
+      channel->readWithSizeIntoVector(raw_msg);
+			pk_p1_sendable->initFromByteVector(raw_msg);
+			shared_ptr<PublicKey> pk_p1 = elgamal.reconstructPublicKey(pk_p1_sendable.get());
+			shared_ptr<GroupElement> h = ((ElGamalPublicKey*) pk_p1.get())->getH();
+			cout << "h: " << ((OpenSSLZpSafePrimeElement *)h.get())->getElementValue() << endl;
+
+			//Set pk_p1 to public key and encrypt random element
+			elgamal.setKey(pk_p1, pair.second);
+			auto m = dlog->createRandomElement();
+			cout << "m: " << ((OpenSSLZpSafePrimeElement *)m.get())->getElementValue() << endl;
+			GroupElementPlaintext p_m(m);
+			shared_ptr<AsymmetricCiphertext> c_m = elgamal.encrypt(make_shared<GroupElementPlaintext>(p_m));
+
+			//Send [m] to party 1
+			shared_ptr<AsymmetricCiphertextSendableData> c_m_sendable = ((ElGamalOnGroupElementCiphertext*) c_m.get())->generateSendableData();
+			string c_m_sendable_string = c_m_sendable->toString();
+			channel->writeWithSize(c_m_sendable_string);
 
       /*auto dlog = make_shared<OpenSSLDlogECF2m>();
       shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog);

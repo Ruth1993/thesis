@@ -404,3 +404,7 @@ int main_ss() {
 
 	return 0;
 }
+
+int main_ss(int argc, char* argv[]) {
+	return 0;
+}

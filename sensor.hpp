@@ -9,6 +9,14 @@
 #include "../libscapi/include/mid_layer/OpenSSLSymmetricEnc.hpp"
 #include "../libscapi/include/primitives/DlogOpenSSL.hpp"
 #include "../libscapi/include/mid_layer/ElGamalEnc.hpp"
+#include "../libscapi/include/infra/Scanner.hpp"
+#include "../libscapi/include/infra/ConfigFile.hpp"
+#include "../libscapi/include/comm/Comm.hpp"
+#include "../libscapi/include/infra/Common.hpp"
+#include "../libscapi/include/interactive_mid_protocols/CommitmentScheme.hpp"
+#include "../libscapi/include/interactive_mid_protocols/CommitmentSchemePedersen.hpp"
+
+#include <boost/thread/thread.hpp>
 
 using namespace std;
 
@@ -69,6 +77,6 @@ public:
 	void print_outcomes(int total);
 };
 
-int main_ss();
+int main_ss(int argc, char* argv[]);
 
 #endif

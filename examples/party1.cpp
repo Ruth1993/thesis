@@ -1,12 +1,16 @@
 #include "../../libscapi/include/comm/Comm.hpp"
+#include "../../libscapi/include/infra/Common.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/CommitmentScheme.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/CommitmentSchemePedersen.hpp"
-
 #include "../../libscapi/include/mid_layer/OpenSSLSymmetricEnc.hpp"
 #include "../../libscapi/include/primitives/DlogOpenSSL.hpp"
 #include "../../libscapi/include/mid_layer/ElGamalEnc.hpp"
+#include "../../libscapi/include/infra/Scanner.hpp"
+#include "../../libscapi/include/infra/ConfigFile.hpp"
 
 #include <boost/thread/thread.hpp>
+
+#include <vector>
 
 void print_send_message(const string  &s, int i) {
 	cout << "sending message number " << i << " message: " << s << endl;
@@ -44,10 +48,21 @@ int main(int argc, char* argv[]) {
     shared_ptr<CommParty> channel = make_shared<CommPartyTCPSynced>(io_service, p1, p2);
 
     //setup ElGamal communication
-    auto dlog = make_shared<OpenSSLDlogZpSafePrime>(128);
+		//First read Dlog parameters from file dlog_params.txt
+		ConfigFile cf("dlog_params.txt");
+		string p = cf.Value("", "p");
+		string g = cf.Value("", "g");
+		string q = cf.Value("", "q");
+    auto dlog = make_shared<OpenSSLDlogZpSafePrime>(q, g, p);
     ElGamalOnGroupElementEnc elgamal(dlog);
     auto pair = elgamal.generateKey();
     elgamal.setKey(pair.first, pair.second);
+
+		shared_ptr<GroupElement> h = ((ElGamalPublicKey*) pair.first.get())->getH();
+		cout << "h: " << ((OpenSSLZpSafePrimeElement *)h.get())->getElementValue() << endl;
+
+		shared_ptr<GroupParams> group_params = dlog->getGroupParams();
+		cout << ((ZpGroupParams*) group_params.get())->toString() << endl;
 
     try {
       channel->join(500, 5000);
@@ -56,9 +71,22 @@ int main(int argc, char* argv[]) {
       string longMessage = "Hi, this is a long message to test the writeWithSize approach";
       channel->writeWithSize(longMessage);
 
-      shared_ptr<KeySendableData> pk_sendable = pair.first->generateSendableData();
 
-      chanell->writeWithSize(pk_sendable->getEncoded());
+			//Send public key to party 2
+      shared_ptr<KeySendableData> pk_sendable = ((ElGamalPublicKey*) pair.first.get())->generateSendableData();
+			string pk_sendable_string = pk_sendable->toString();
+      channel->writeWithSize(pk_sendable_string);
+
+			//Receive [m] from party 2
+			shared_ptr<AsymmetricCiphertextSendableData> c_m_sendable = make_shared<ElGamalOnGrElSendableData>(dlog->getGenerator()->generateSendableData(), dlog->getGenerator()->generateSendableData());
+			vector<byte> raw_msg;
+			channel->readWithSizeIntoVector(raw_msg);
+			c_m_sendable->initFromByteVector(raw_msg);
+			shared_ptr<AsymmetricCiphertext> c_m = elgamal.reconstructCiphertext(c_m_sendable.get());
+
+			//Decrypt [m] and print on screen
+			shared_ptr<Plaintext> p_m = elgamal.decrypt(c_m.get());
+			cout << "m: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)p_m.get())->getElement()).get())->getElementValue() << endl;
 
       /*auto dlog = make_shared<OpenSSLDlogECF2m>();
       shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog);
