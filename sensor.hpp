@@ -22,6 +22,9 @@ using namespace std;
 
 class Sensor {
 private:
+	//Channel object
+	shared_ptr<CommParty> channel;
+
 	//ElGamal and AES objects
 	shared_ptr<OpenSSLCTREncRandomIV> aes_enc;
  	shared_ptr<OpenSSLDlogZpSafePrime> dlog;
@@ -32,7 +35,7 @@ private:
 	shared_ptr<PrivateKey> sk_ss;
 
 public:
-	Sensor(shared_ptr<OpenSSLDlogZpSafePrime> dlogg);
+	Sensor(string config_file_path);
 
 	shared_ptr<PublicKey> key_gen();
 
@@ -75,6 +78,12 @@ public:
 	vector<shared_ptr<AsymmetricCiphertext>> encrypt_scores(int nr);
 
 	void print_outcomes(int total);
+
+	int usage();
+
+	int main_sh();
+
+	int main_mal();
 };
 
 int main_ss(int argc, char* argv[]);

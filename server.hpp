@@ -12,6 +12,10 @@
 #include "../libscapi/include/mid_layer/ElGamalEnc.hpp"
 #include "../libscapi/include/infra/Scanner.hpp"
 #include "../libscapi/include/infra/ConfigFile.hpp"
+#include "../libscapi/include/comm/Comm.hpp"
+#include "../libscapi/include/infra/Common.hpp"
+#include "../libscapi/include/interactive_mid_protocols/CommitmentScheme.hpp"
+#include "../libscapi/include/interactive_mid_protocols/CommitmentSchemePedersen.hpp"
 
 #include <boost/thread/thread.hpp>
 
@@ -19,6 +23,9 @@ using namespace std;
 
 class Server {
 private:
+	//Channel object
+	shared_ptr<CommParty> channel;
+
 	//ElGamal and AES objects
 	shared_ptr<OpenSSLCTREncRandomIV> aes_enc;
  	shared_ptr<OpenSSLDlogZpSafePrime> dlog;
@@ -31,7 +38,7 @@ private:
 	Table table;
 
 public:
-	Server(shared_ptr<OpenSSLDlogZpSafePrime> dlogg);
+	Server(string config_file_path);
 
 	shared_ptr<PublicKey> key_gen();
 
@@ -44,8 +51,6 @@ public:
 	vector<shared_ptr<AsymmetricCiphertext>> compare(shared_ptr<AsymmetricCiphertext> cap_s_enc, biginteger t, biginteger max_s);
 
 	vector<shared_ptr<AsymmetricCiphertext>> permute(vector<shared_ptr<AsymmetricCiphertext>> cap_c_enc);
-
-	//vector<shared_ptr<AsymmetricCiphertext>> D1(vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc);
 
 	pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> fetch_key_pair(int u);
 
@@ -62,8 +67,14 @@ public:
 	void test_permute(biginteger cap_s, biginteger t, biginteger max_s);
 
 	shared_ptr<ElGamalOnGroupElementCiphertext> test_D1(shared_ptr<AsymmetricCiphertext> cipher);
+
+	int usage();
+
+	int main_sh();
+
+	int main_mal();
 };
 
-int main_sv(int argc, char* argv[]) ;
+int main(int argc, char* argv[]);
 
 #endif
