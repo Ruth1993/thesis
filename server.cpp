@@ -278,7 +278,7 @@ int Server::usage() {
 
 int Server::main_sh() {
 	cout << "sh test" << endl;
-
+	cout << "another test" << endl;
 
 	return 0;
 }
