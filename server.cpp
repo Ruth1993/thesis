@@ -9,24 +9,14 @@
 
 using namespace std;
 
-Server::Server(string config_file_path) {
-	//First set up channel
-	boost::asio::io_service io_service;
-
-	SocketPartyData server = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8000);
-	SocketPartyData sensor = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8001);
-
-	channel = make_shared<CommPartyTCPSynced>(io_service, server, sensor);
-
-	//Intialize encryption objects
+Server::Server(shared_ptr<OpenSSLDlogZpSafePrime> dlogg) {
 	aes_enc = make_shared<OpenSSLCTREncRandomIV>("AES");
 
-	ConfigFile cf(config_file_path);
-	string p = cf.Value("", "p");
-	string g = cf.Value("", "g");
-	string q = cf.Value("", "q");
-	dlog = make_shared<OpenSSLDlogZpSafePrime>(q, g, p);
+	dlog = dlogg;
 	elgamal = make_shared<ElGamalOnGroupElementEnc>(dlog);
+
+	auto g = dlog->getGenerator();
+	biginteger q = dlog->getOrder();
 }
 
 /*
@@ -289,16 +279,6 @@ int Server::usage() {
 int Server::main_sh() {
 	cout << "sh test" << endl;
 
-	//First join channel
-	try {
-		channel->join(500, 5000);
-		cout << "channel established" << endl;
-	} catch (const logic_error& e) {
-			//Log error message in the exception object
-			cerr << e.what();
-	}
-
-	
 
 	return 0;
 }
@@ -308,23 +288,6 @@ int Server::main_mal() {
 	return 0;
 }
 
-int main(int argc, char* argv[]) {
-	cout << "test main" << endl;
-
-	Server sv = Server("dlog_params.txt");
-
-	if(argc == 1) {
-		return sv.main_sh();
-	} else if(argc == 2) {
-	string arg(argv[1]);
-		if(arg == "sh") {
-			return sv.main_sh();
-		} else if(arg == "mal") {
-			return sv.main_mal();
-		}
-	}
-
-	return sv.usage();
-
+int main_sv(int argc, char* argv[]) {
 	return 0;
 }

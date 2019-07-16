@@ -38,7 +38,7 @@ private:
 	Table table;
 
 public:
-	Server(string config_file_path);
+	Server(shared_ptr<OpenSSLDlogZpSafePrime> dlogg);
 
 	shared_ptr<PublicKey> key_gen();
 
@@ -75,6 +75,6 @@ public:
 	int main_mal();
 };
 
-int main(int argc, char* argv[]);
+int main_sv(int argc, char* argv[]);
 
 #endif

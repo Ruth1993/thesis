@@ -35,7 +35,7 @@ private:
 	shared_ptr<PrivateKey> sk_ss;
 
 public:
-	Sensor(string config_file_path);
+	Sensor(shared_ptr<OpenSSLDlogZpSafePrime> dlogg);
 
 	shared_ptr<PublicKey> key_gen();
 

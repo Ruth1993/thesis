@@ -393,15 +393,31 @@ void Sensor::print_outcomes(int total) {
 	}
 }
 
-int main_ss() {
-	Sensor ss(make_shared<OpenSSLDlogZpSafePrime>(128));
+int Sensor::usage() {
+	cout << "Usage: " << endl;
+	cout << "*	Semi-honest protocol with key release: ./sensor| ./sensor sh" << endl;
+	cout << "*	Malicious protocol with key release: ./sensor mal" << endl;
 
-	ss.capture(make_pair(3, 2));
+	return 0;
+}
 
-	//ss.test_look_up();
+int Sensor::main_sh() {
+	cout << "sh test" << endl;
 
-	//ss.enroll();
+	/*//First join channel
+	try {
+		channel->join(500, 5000);
+		cout << "channel established" << endl;
+	} catch (const logic_error& e) {
+			//Log error message in the exception object
+			cerr << e.what();
+	}*/
 
+	return 0;
+}
+
+int Sensor::main_mal() {
+	cout << "not yet implemented" << endl;
 	return 0;
 }
 
