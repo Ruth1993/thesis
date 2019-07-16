@@ -9,39 +9,44 @@
 
 using namespace std;
 
-Server::Server(shared_ptr<OpenSSLDlogZpSafePrime> dlogg) {
+Server::Server(string config_file_path) {
+	//First set up channel
+	boost::asio::io_service io_service;
+
+	SocketPartyData server = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8000);
+	SocketPartyData sensor = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8001);
+
+	channel = make_shared<CommPartyTCPSynced>(io_service, server, sensor);
+
+	//Intialize encryption objects
 	aes_enc = make_shared<OpenSSLCTREncRandomIV>("AES");
 
-	dlog = dlogg;
+	ConfigFile cf(config_file_path);
+	string p = cf.Value("", "p");
+	string g = cf.Value("", "g");
+	string q = cf.Value("", "q");
+	dlog = make_shared<OpenSSLDlogZpSafePrime>(q, g, p);
 	elgamal = make_shared<ElGamalOnGroupElementEnc>(dlog);
 
-	auto g = dlog->getGenerator();
-	biginteger q = dlog->getOrder();
-}
-
-/*
-*		Generate ElGamal key pair
-*/
-shared_ptr<PublicKey> Server::key_gen() {
+	//Generate and set ElGamal keypair
 	auto pair = elgamal->generateKey();
 
-	shared_ptr<PublicKey> pk_sv = pair.first;
-	sk_sv = pair.second;
+	pk_own = pair.first;
+	sk_own = pair.second;
 
-	elgamal->setKey(pk_sv, sk_sv);
+	elgamal->setKey(pk_own, sk_own);
 
-	return pk_sv;
-}
+	shared_ptr<GroupElement> h = ((ElGamalPublicKey*) pk_own.get())->getH();
+	cout << "h: " << ((OpenSSLZpSafePrimeElement *)h.get())->getElementValue() << endl;
 
-/*
-*		Setup shared public key for double encryption
-*/
-void Server::key_setup(shared_ptr<PublicKey> pk_ss) {
-	shared_ptr<GroupElement> h_shared = dlog->exponentiate(((ElGamalPublicKey*) pk_ss.get())->getH().get(), ((ElGamalPrivateKey*) sk_sv.get())->getX());
-
-	pk_shared = make_shared<ElGamalPublicKey>(ElGamalPublicKey(h_shared));
-
-	elgamal->setKey(pk_shared);
+	//Join channel
+	try {
+		channel->join(500, 5000);
+		cout << "channel established" << endl;
+	} catch (const logic_error& e) {
+			//Log error message in the exception object
+			cerr << e.what();
+	}
 }
 
 /*
@@ -160,7 +165,7 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::D1(vector<shared_ptr<Asymmetric
 	vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc2;
 
 	for(shared_ptr<AsymmetricCiphertext> B_i_enc : vec_B_enc) {
-		shared_ptr<GroupElement> b1_prime = dlog->exponentiate(((ElGamalOnGroupElementCiphertext*) B_i_enc.get())->getC1().get(), ((ElGamalPrivateKey*) sk_sv.get())->getX());
+		shared_ptr<GroupElement> b1_prime = dlog->exponentiate(((ElGamalOnGroupElementCiphertext*) B_i_enc.get())->getC1().get(), ((ElGamalPrivateKey*) sk_own.get())->getX());
 		ElGamalOnGroupElementCiphertext B_i_enc2 = ElGamalOnGroupElementCiphertext(b1_prime, ((ElGamalOnGroupElementCiphertext*) B_i_enc.get())->getC2());
 		vec_B_enc2.push_back(make_shared<ElGamalOnGroupElementCiphertext>(B_i_enc2));
 	}
@@ -264,7 +269,7 @@ void Server::test_permute(biginteger S, biginteger t, biginteger max_s) {
 *		Test function D1
 */
 shared_ptr<ElGamalOnGroupElementCiphertext> Server::test_D1(shared_ptr<AsymmetricCiphertext> cipher) {
-	shared_ptr<GroupElement> c_1_prime = dlog->exponentiate(((ElGamalOnGroupElementCiphertext*) cipher.get())->getC1().get(), ((ElGamalPrivateKey*) sk_sv.get())->getX());
+	shared_ptr<GroupElement> c_1_prime = dlog->exponentiate(((ElGamalOnGroupElementCiphertext*) cipher.get())->getC1().get(), ((ElGamalPrivateKey*) sk_own.get())->getX());
 	return make_shared<ElGamalOnGroupElementCiphertext>(ElGamalOnGroupElementCiphertext(c_1_prime, ((ElGamalOnGroupElementCiphertext*) cipher.get())->getC2()));
 }
 
@@ -277,8 +282,20 @@ int Server::usage() {
 }
 
 int Server::main_sh() {
-	cout << "sh test" << endl;
-	cout << "another test" << endl;
+	try {
+		//First send public key
+		send_pk();
+
+		//Receive public key from Sensor
+		shared_ptr<PublicKey> pk_ss = recv_pk();
+
+		//Set shared public keys
+		key_setup(pk_ss);
+	} catch (const logic_error& e) {
+			// Log error message in the exception object
+			cerr << e.what();
+	}
+
 
 	return 0;
 }
@@ -288,6 +305,24 @@ int Server::main_mal() {
 	return 0;
 }
 
-int main_sv(int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
+	cout << "before object" << endl;
+	Server sv = Server("dlog_params.txt");
+
+	cout << "test"  << endl;
+
+	if(argc == 1) {
+		return sv.main_sh();
+	} else if(argc == 2) {
+	string arg(argv[1]);
+		if(arg == "sh") {
+			return sv.main_sh();
+		} else if(arg == "mal") {
+			return sv.main_mal();
+		}
+	}
+
+	return sv.usage();
+
 	return 0;
 }

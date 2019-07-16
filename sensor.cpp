@@ -10,39 +10,41 @@
 
 using namespace std;
 
-Sensor::Sensor(shared_ptr<OpenSSLDlogZpSafePrime> dlogg) {
+Sensor::Sensor(string config_file_path) {
+	//First set up channel
+	boost::asio::io_service io_service;
+
+	SocketPartyData server = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8000);
+	SocketPartyData sensor = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8001);
+
+	channel = make_shared<CommPartyTCPSynced>(io_service, sensor, server);
+
+	//Initialize encryption objects
 	aes_enc = make_shared<OpenSSLCTREncRandomIV>("AES");
 
-	dlog = dlogg;
+	ConfigFile cf(config_file_path);
+	string p = cf.Value("", "p");
+	string g = cf.Value("", "g");
+	string q = cf.Value("", "q");
+	dlog = make_shared<OpenSSLDlogZpSafePrime>(q, g, p);
 	elgamal = make_shared<ElGamalOnGroupElementEnc>(dlog);
 
-	auto g = dlog->getGenerator();
-	biginteger q = dlog->getOrder();
-}
-
-/*
-*		Generate ElGamal key pair
-*/
-shared_ptr<PublicKey> Sensor::key_gen() {
+	//Generate ElGamal keypair
 	auto pair = elgamal->generateKey();
 
-	pk_ss = pair.first;
-	sk_ss = pair.second;
+	pk_own = pair.first;
+	sk_own = pair.second;
 
-	elgamal->setKey(pk_ss, sk_ss);
+	elgamal->setKey(pk_own, sk_own);
 
-	return pk_ss;
-}
-
-/*
-*		Setup shared public key for double encryption
-*/
-void Sensor::key_setup(shared_ptr<PublicKey> pk_sv) {
-	shared_ptr<GroupElement> h_shared = dlog->exponentiate(((ElGamalPublicKey*) pk_sv.get())->getH().get(), ((ElGamalPrivateKey*) sk_ss.get())->getX());
-
-	pk_shared = make_shared<ElGamalPublicKey>(ElGamalPublicKey(h_shared));
-
-	elgamal->setKey(pk_shared);
+	//Join channel
+	try {
+		channel->join(500, 5000);
+		cout << "channel established" << endl;
+	} catch (const logic_error& e) {
+			//Log error message in the exception object
+			cerr << e.what();
+	}
 }
 
 /*
@@ -395,7 +397,7 @@ void Sensor::print_outcomes(int total) {
 
 int Sensor::usage() {
 	cout << "Usage: " << endl;
-	cout << "*	Semi-honest protocol with key release: ./sensor| ./sensor sh" << endl;
+	cout << "*	Semi-honest protocol with key release: ./sensor | ./sensor sh" << endl;
 	cout << "*	Malicious protocol with key release: ./sensor mal" << endl;
 
 	return 0;
@@ -404,14 +406,14 @@ int Sensor::usage() {
 int Sensor::main_sh() {
 	cout << "sh test" << endl;
 
-	/*//First join channel
-	try {
-		channel->join(500, 5000);
-		cout << "channel established" << endl;
-	} catch (const logic_error& e) {
-			//Log error message in the exception object
-			cerr << e.what();
-	}*/
+	//Receive public key from server
+	shared_ptr<PublicKey> pk_sv = recv_pk();
+
+	//Send own public key to Server
+	send_pk();
+
+	//Set shared public key
+	key_setup(pk_sv);
 
 	return 0;
 }
@@ -421,7 +423,21 @@ int Sensor::main_mal() {
 	return 0;
 }
 
-int main_ss(int argc, char* argv[]) {
-	cout << "test sensor" << endl;
+int main(int argc, char* argv[]) {
+	Sensor ss = Sensor("dlog_params.txt");
+
+	if(argc == 1) {
+		return ss.main_sh();
+	} else if(argc == 2) {
+	string arg(argv[1]);
+		if(arg == "sh") {
+			return ss.main_sh();
+		} else if(arg == "mal") {
+			return ss.main_mal();
+		}
+	}
+
+	return ss.usage();
+
 	return 0;
 }
