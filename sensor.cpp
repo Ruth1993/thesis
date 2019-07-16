@@ -10,33 +10,14 @@
 
 using namespace std;
 
-Sensor::Sensor(string config_file_path) {
-	//First set up channel
-	boost::asio::io_service io_service;
-
-	SocketPartyData server = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8000);
-	SocketPartyData sensor = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8001);
-
-	channel = make_shared<CommPartyTCPSynced>(io_service, sensor, server);
-
-	//Initialize encryption objects
+Sensor::Sensor(shared_ptr<OpenSSLDlogZpSafePrime> dlogg) {
 	aes_enc = make_shared<OpenSSLCTREncRandomIV>("AES");
 
-	ConfigFile cf(config_file_path);
-	string p = cf.Value("", "p");
-	string g = cf.Value("", "g");
-	string q = cf.Value("", "q");
-	dlog = make_shared<OpenSSLDlogZpSafePrime>(q, g, p);
+	dlog = dlogg;
 	elgamal = make_shared<ElGamalOnGroupElementEnc>(dlog);
 
-	//Join channel
-	try {
-		channel->join(500, 5000);
-		cout << "channel established" << endl;
-	} catch (const logic_error& e) {
-			//Log error message in the exception object
-			cerr << e.what();
-	}
+	auto g = dlog->getGenerator();
+	biginteger q = dlog->getOrder();
 }
 
 /*
@@ -412,53 +393,19 @@ void Sensor::print_outcomes(int total) {
 	}
 }
 
-int Sensor::usage() {
-	cout << "Usage: " << endl;
-	cout << "*	Semi-honest protocol with key release: ./sensor| ./sensor sh" << endl;
-	cout << "*	Malicious protocol with key release: ./sensor mal" << endl;
+int main_ss() {
+	Sensor ss(make_shared<OpenSSLDlogZpSafePrime>(128));
+
+	ss.capture(make_pair(3, 2));
+
+	//ss.test_look_up();
+
+	//ss.enroll();
 
 	return 0;
 }
 
-int Sensor::main_sh() {
-	cout << "sh test" << endl;
-
-	//First join channel
-	try {
-		channel->join(500, 5000);
-		cout << "channel established" << endl;
-	} catch (const logic_error& e) {
-			//Log error message in the exception object
-			cerr << e.what();
-	}
-
-
-
-	return 0;
-}
-
-int Sensor::main_mal() {
-	cout << "not yet implemented" << endl;
-	return 0;
-}
-
-int main(int argc, char* argv[]) {
-	cout << "test main" << endl;
-
-	Sensor ss = Sensor("dlog_params.txt");
-
-	if(argc == 1) {
-		return ss.main_sh();
-	} else if(argc == 2) {
-	string arg(argv[1]);
-		if(arg == "sh") {
-			return ss.main_sh();
-		} else if(arg == "mal") {
-			return ss.main_mal();
-		}
-	}
-
-	return ss.usage();
-
+int main_ss(int argc, char* argv[]) {
+	cout << "test sensor" << endl;
 	return 0;
 }
