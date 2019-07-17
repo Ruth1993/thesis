@@ -12,11 +12,13 @@ using namespace std;
 
 class Server : public Party {
 private:
-	shared_ptr<PublicKey> pk_sv;
-	shared_ptr<PrivateKey> sk_sv;
+	//Protocol parameters
+	const biginteger t = 15;
 
 	//Table
 	Table table;
+
+
 
 public:
 	Server(string config_file_path);

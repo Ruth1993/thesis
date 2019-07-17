@@ -10,14 +10,12 @@ using namespace std;
 */
 Template::Template(pair<int, int> size, biginteger min_s, biginteger max_s) {
   k = size.first;
-  b = size.second;
-
-  int col = pow(2, b);
+  two_pow_b = size.second;
 
   for(int i=0; i<k; i++) {
     vector<biginteger> vec_col;
 
-    for(int j=0; j<col; j++) {
+    for(int j=0; j<two_pow_b; j++) {
       // create a random value s_{i,j}
       auto gen = get_seeded_prg();
       biginteger s = getRandomInRange(min_s, max_s, gen.get());
@@ -29,29 +27,11 @@ Template::Template(pair<int, int> size, biginteger min_s, biginteger max_s) {
   }
 }
 
-Template::Template() {
-  k = 3;
-  b = 2;
-
-  int col = pow(2, b);
-
-  for(int i=0; i<k; i++) {
-    vector<biginteger> vec_col;
-
-    for(int j=0; j<col; j++) {
-      // create a random value s_{i,j}
-      vec_col.push_back(j);
-    }
-
-    T.push_back(vec_col);
-  }
-}
-
 /*
-*   Return log_2(n), where n is the number of columns in the template
+*   Return 2^b, which is the number of columns in the template
 */
-int Template::get_b() {
-  return b;
+int Template::get_two_pow_b() {
+  return two_pow_b;
 }
 
 /*
@@ -76,6 +56,33 @@ biginteger Template::get(int i, int j) {
 }
 
 /*
+*   Add new column to template
+*/
+void Template::add_col(vector<biginteger> vec_col) {
+  T.push_back(vec_col);
+}
+
+/*
+*   Add new element to template by appending it to the i'th column
+*/
+void Template::add_elem(biginteger elem, int i) {
+  if(i > size().first) {
+    //column doesn't exist yet, so first add column
+    vector<biginteger> new_col;
+    add_col(new_col);
+  }
+
+  vector<biginteger> col = get_col(i);
+  col.push_back(elem);
+}
+
+void Template::set_elem(biginteger elem, int i, int j) {
+  if(i <= size().first && j <= size().second) {
+    T[i][j] = elem;
+  }
+}
+
+/*
 *   Print template
 */
 void Template::print() {
@@ -96,20 +103,14 @@ void Template::print() {
 }
 
 /*
-*   Return template size (k, b)
+*   Return template size (k, 2^b)
 */
 pair<int, int> Template::size() {
   return make_pair(T.size(), T[0].size());
 }
 
 /*
-*   Add new column to encrypted template
-*/
-void Template_enc::add_col(vector<shared_ptr<AsymmetricCiphertext>> vec_col_enc) {
-  T_enc.push_back(vec_col_enc);
-}
-/*
-*   Return template size (k, b)
+*   Return template size (k, 2^b)
 */
 pair<int, int> Template_enc::size() {
   return make_pair(T_enc.size(), T_enc[0].size());
@@ -122,9 +123,33 @@ shared_ptr<AsymmetricCiphertext> Template_enc::get_elem(int i, int j) {
   return T_enc[i][j];
 }
 
+vector<shared_ptr<AsymmetricCiphertext>> Template_enc::get_col(int i) {
+  return T_enc[i];
+}
+
+/*
+*   Add new column to encrypted template
+*/
+void Template_enc::add_col(vector<shared_ptr<AsymmetricCiphertext>> vec_col_enc) {
+  T_enc.push_back(vec_col_enc);
+}
+
+/*
+*   Add new element to encrypted template by appending it to the i'th column
+*/
+void Template_enc::add_elem(shared_ptr<AsymmetricCiphertext> elem, int i) {
+  if(i > size().first) {
+    //column doesn't exist yet, so first add column
+    vector<shared_ptr<AsymmetricCiphertext>> new_col;
+    add_col(new_col);
+  }
+
+  vector<shared_ptr<AsymmetricCiphertext>> col = get_col(i);
+  col.push_back(elem);
+}
+
 int main_tp() {
-  Template T;
-  T.print();
+  
 
   return 0;
 }

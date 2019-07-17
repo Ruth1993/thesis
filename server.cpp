@@ -36,9 +36,6 @@ Server::Server(string config_file_path) {
 
 	elgamal->setKey(pk_own, sk_own);
 
-	shared_ptr<GroupElement> h = ((ElGamalPublicKey*) pk_own.get())->getH();
-	cout << "h: " << ((OpenSSLZpSafePrimeElement *)h.get())->getElementValue() << endl;
-
 	//Join channel
 	try {
 		channel->join(500, 5000);
@@ -291,6 +288,13 @@ int Server::main_sh() {
 
 		//Set shared public keys
 		key_setup(pk_ss);
+
+		//Receive enrollment parameters from sensor
+		string u = recv_msg(); //receive u
+		shared_ptr<Template_enc> T_enc = recv_template(); //receive [[T_u]]
+		//send_template(T_enc);
+		cout << u << endl;
+
 	} catch (const logic_error& e) {
 			// Log error message in the exception object
 			cerr << e.what();
@@ -306,7 +310,6 @@ int Server::main_mal() {
 }
 
 int main(int argc, char* argv[]) {
-	cout << "before object" << endl;
 	Server sv = Server("dlog_params.txt");
 
 	cout << "test"  << endl;

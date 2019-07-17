@@ -1,6 +1,8 @@
 #ifndef PARTY_H
 #define PARTY_H
 
+#include <string>
+
 #include "../libscapi/include/mid_layer/OpenSSLSymmetricEnc.hpp"
 #include "../libscapi/include/primitives/DlogOpenSSL.hpp"
 #include "../libscapi/include/mid_layer/ElGamalEnc.hpp"
@@ -29,16 +31,40 @@ protected:
   shared_ptr<PrivateKey> sk_own;
   shared_ptr<PublicKey> pk_shared;
 
+  //Protocol parameters
+  const pair<int, int> template_size = make_pair(3,4); //assert sqrt(template_size.second) == integer
+  const int min_s = 0;
+  const int max_s = 10;
+  const biginteger max_S = template_size.first * max_s;
+
 public:
   shared_ptr<PublicKey> recv_pk();
 
   void key_setup(shared_ptr<PublicKey> pk_other);
 
+  void send_msg(string msg);
+
+  void send_msg(int msg);
+
   void send_pk();
 
-  void send_msg_enc(shared_ptr<AsymmetricCiphertext> c_m);
+  void send_elgamal_msg(shared_ptr<AsymmetricCiphertext> c_m);
 
-  void send_template();
+  void send_aes_msg(shared_ptr<SymmetricCiphertext> c_m);
+
+  void send_vec_enc(vector<shared_ptr<AsymmetricCiphertext>> vec_enc);
+
+  void send_template(shared_ptr<Template_enc> T_enc);
+
+  string recv_msg();
+
+  shared_ptr<AsymmetricCiphertext> recv_elgamal_msg();
+
+  shared_ptr<SymmetricCiphertext> recv_aes_msg();
+
+  vector<shared_ptr<AsymmetricCiphertext>> recv_vec_enc(int size);
+
+  shared_ptr<Template_enc> recv_template();
 };
 
 #endif

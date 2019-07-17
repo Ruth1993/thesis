@@ -150,6 +150,24 @@ shared_ptr<Template_enc> Sensor::encrypt_template(Template T) {
 	return make_shared<Template_enc>(T_enc);
 }
 
+shared_ptr<Template> Sensor::decrypt_template(Template_enc T_enc) {
+	pair<int, int> size = T_enc.size();
+
+	Template T(size, 0, 0);
+
+	for(int i=0; i<size.first; i++) {
+		for(int j=0; j<size.second; j++) {
+			shared_ptr<AsymmetricCiphertext> s_enc = T_enc.get_elem(i, j);
+			shared_ptr<Plaintext> p_s = elgamal->decrypt(s_enc.get());
+			biginteger s = ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)p_s.get())->getElement()).get())->getElementValue();
+
+			T.set_elem(s, i, j);
+		}
+	}
+
+	return make_shared<Template>(T);
+}
+
 /*
 *		Enrollment procedure (Steps 1-6)
 */
@@ -286,7 +304,7 @@ shared_ptr<GroupElement> Sensor::check_key(vector<shared_ptr<GroupElement>> vec_
 void Sensor::test_look_up() {
 	auto g = dlog->getGenerator();
 
-	Template T;
+	Template T(template_size, min_s, max_s);
 	T.print();
 
 	shared_ptr<Template_enc> T_enc = encrypt_template(T);
@@ -395,6 +413,9 @@ void Sensor::print_outcomes(int total) {
 	}
 }
 
+/*
+*		Show usage of the program
+*/
 int Sensor::usage() {
 	cout << "Usage: " << endl;
 	cout << "*	Semi-honest protocol with key release: ./sensor | ./sensor sh" << endl;
@@ -403,8 +424,12 @@ int Sensor::usage() {
 	return 0;
 }
 
+/*
+*		Main function for semi-honest protocol
+*/
 int Sensor::main_sh() {
 	cout << "sh test" << endl;
+
 
 	//Receive public key from server
 	shared_ptr<PublicKey> pk_sv = recv_pk();
@@ -415,14 +440,27 @@ int Sensor::main_sh() {
 	//Set shared public key
 	key_setup(pk_sv);
 
+	//Create enrollment parameters and send to server
+	int u = 1;
+	tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enrollment = enroll(u, template_size, min_s, max_s);
+	send_msg(get<0>(enrollment)); //send u
+	send_template(get<1>(enrollment)); //send [[T_u]]
+	//shared_ptr<Template_enc> T_enc = recv_template();
+
 	return 0;
 }
 
+/*
+*		Main function for malicious protocol
+*/
 int Sensor::main_mal() {
 	cout << "not yet implemented" << endl;
 	return 0;
 }
 
+/*
+*		General main function
+*/
 int main(int argc, char* argv[]) {
 	Sensor ss = Sensor("dlog_params.txt");
 
