@@ -68,7 +68,7 @@ void Party::send_aes_msg(shared_ptr<SymmetricCiphertext> c_m) {
 */
 void Party::send_vec_enc(vector<shared_ptr<AsymmetricCiphertext>> vec_enc) {
   for(shared_ptr<AsymmetricCiphertext> elem : vec_enc) {
-    send_elgamal_enc(elem);
+    send_elgamal_msg(elem);
   }
 }
 
@@ -80,8 +80,8 @@ void Party::send_template(shared_ptr<Template_enc> T_enc) {
 
   for(int i=0; i<size.first; i++) {
     for(int j=0; i<size.second; j++) {
-      shared_ptr<AsymmetricCiphertext> elem = T_enc.get_elem(i, j);
-      send_elgamal_enc(elem);
+      shared_ptr<AsymmetricCiphertext> elem = T_enc->get_elem(i, j);
+      send_elgamal_msg(elem);
     }
   }
 }

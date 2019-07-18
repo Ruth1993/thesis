@@ -291,7 +291,8 @@ int Server::main_sh() {
 
 		//Receive enrollment parameters from sensor
 		string u = recv_msg(); //receive u
-		shared_ptr<Template_enc> T_enc = recv_template(); //receive [[T_u]]
+		shared_ptr<AsymmetricCiphertext> recv_elgamal_msg();
+		//shared_ptr<Template_enc> T_enc = recv_template(); //receive [[T_u]]
 		//send_template(T_enc);
 		cout << u << endl;
 
