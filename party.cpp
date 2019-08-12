@@ -71,42 +71,26 @@ void Party::send_msg(int msg) {
 *   Send public key to other party
 */
 void Party::send_pk() {
-  try {
-    shared_ptr<KeySendableData> pk_sendable = ((ElGamalPublicKey*) pk_own.get())->generateSendableData();
-    string pk_sendable_string = pk_sendable->toString();
-    channel->writeWithSize(pk_sendable_string);
-  } catch (const logic_error& e) {
-			// Log error message in the exception object
-			cerr << e.what();
-	}
-
+  shared_ptr<KeySendableData> pk_sendable = ((ElGamalPublicKey*) pk_own.get())->generateSendableData();
+  string pk_sendable_string = pk_sendable->toString();
+  channel->writeWithSize(pk_sendable_string);
 }
 
 /*
 *   Send asymmetric ciphertext to other party
 */
 void Party::send_elgamal_msg(shared_ptr<AsymmetricCiphertext> c_m) {
-  try {
-    shared_ptr<AsymmetricCiphertextSendableData> c_m_sendable = ((ElGamalOnGroupElementCiphertext*) c_m.get())->generateSendableData();
-    string c_m_sendable_string = c_m_sendable->toString();
-    channel->writeWithSize(c_m_sendable_string);
-  } catch (const logic_error& e) {
-			// Log error message in the exception object
-			cerr << e.what();
-	}
+  shared_ptr<AsymmetricCiphertextSendableData> c_m_sendable = ((ElGamalOnGroupElementCiphertext*) c_m.get())->generateSendableData();
+  string c_m_sendable_string = c_m_sendable->toString();
+  channel->writeWithSize(c_m_sendable_string);
 }
 
 /*
 *   Send symmetric ciphertext to other party
 */
 void Party::send_aes_msg(shared_ptr<SymmetricCiphertext> c_m) {
-	try {
-		string c_m_string = c_m->toString();
-		channel->writeWithSize(c_m_string);
-	} catch (const logic_error& e) {
-			// Log error message in the exception object
-			cerr << e.what();
-	}
+	string c_m_string = c_m->toString();
+	channel->writeWithSize(c_m_string);
 }
 
 /*
@@ -140,16 +124,10 @@ void Party::send_template(shared_ptr<Template_enc> T_enc) {
 string Party::recv_msg() {
   string msg;
 
-  try {
-    vector<byte> raw_msg;
-    channel->readWithSizeIntoVector(raw_msg);
-    const byte * uc = &(raw_msg[0]);
-    msg = string(reinterpret_cast<char const*>(uc), raw_msg.size());
-  } catch (const logic_error& e) {
-			// Log error message in the exception object
-			cerr << e.what();
-	}
-
+  vector<byte> raw_msg;
+  channel->readWithSizeIntoVector(raw_msg);
+  const byte * uc = &(raw_msg[0]);
+  msg = string(reinterpret_cast<char const*>(uc), raw_msg.size());
 
   return msg;
 }
@@ -160,19 +138,14 @@ string Party::recv_msg() {
 shared_ptr<PublicKey> Party::recv_pk() {
   shared_ptr<PublicKey> pk_sv;
 
-  try {
-    shared_ptr<KeySendableData> pk_sv_sendable = make_shared<ElGamalPublicKeySendableData>(dlog->getGenerator()->generateSendableData());
-    vector<byte> raw_msg;
-    channel->readWithSizeIntoVector(raw_msg);
-    pk_sv_sendable->initFromByteVector(raw_msg);
-    pk_sv = elgamal->reconstructPublicKey(pk_sv_sendable.get());
+  shared_ptr<KeySendableData> pk_sv_sendable = make_shared<ElGamalPublicKeySendableData>(dlog->getGenerator()->generateSendableData());
+  vector<byte> raw_msg;
+  channel->readWithSizeIntoVector(raw_msg);
+  pk_sv_sendable->initFromByteVector(raw_msg);
+  pk_sv = elgamal->reconstructPublicKey(pk_sv_sendable.get());
 
-    shared_ptr<GroupElement> h = ((ElGamalPublicKey*) pk_sv.get())->getH();
-    cout << "h: " << ((OpenSSLZpSafePrimeElement *)h.get())->getElementValue() << endl;
-  } catch (const logic_error& e) {
-			// Log error message in the exception object
-			cerr << e.what();
-	}
+  shared_ptr<GroupElement> h = ((ElGamalPublicKey*) pk_sv.get())->getH();
+  cout << "h: " << ((OpenSSLZpSafePrimeElement *)h.get())->getElementValue() << endl;
 
 	return pk_sv;
 }
@@ -183,16 +156,11 @@ shared_ptr<PublicKey> Party::recv_pk() {
 shared_ptr<AsymmetricCiphertext> Party::recv_elgamal_msg() {
   shared_ptr<AsymmetricCiphertext> c_m;
 
-  try {
-    shared_ptr<AsymmetricCiphertextSendableData> c_m_sendable = make_shared<ElGamalOnGrElSendableData>(dlog->getGenerator()->generateSendableData(), dlog->getGenerator()->generateSendableData());
-    vector<byte> raw_msg;
-    channel->readWithSizeIntoVector(raw_msg);
-    c_m_sendable->initFromByteVector(raw_msg);
-    c_m = elgamal->reconstructCiphertext(c_m_sendable.get());
-  } catch (const logic_error& e) {
-			// Log error message in the exception object
-			cerr << e.what();
-	}
+  shared_ptr<AsymmetricCiphertextSendableData> c_m_sendable = make_shared<ElGamalOnGrElSendableData>(dlog->getGenerator()->generateSendableData(), dlog->getGenerator()->generateSendableData());
+  vector<byte> raw_msg;
+  channel->readWithSizeIntoVector(raw_msg);
+  c_m_sendable->initFromByteVector(raw_msg);
+  c_m = elgamal->reconstructCiphertext(c_m_sendable.get());
 
   return c_m;
 }
@@ -236,16 +204,21 @@ vector<shared_ptr<AsymmetricCiphertext>> Party::recv_vec_enc(int size) {
 shared_ptr<Template_enc> Party::recv_template() {
   Template_enc T_enc(template_size);
 
-  for(int i=0; i<T_enc.size().first; i++) {
+  for(int i=0; i<template_size.first; i++) {
 		cout << "i: " << i << endl;
-    for(int j=0; j<T_enc.size().second; j++) {
+    for(int j=0; j<template_size.second; j++) {
 			cout << "j: " << j << endl;
+      cout << "before vector element" << endl;
       shared_ptr<AsymmetricCiphertext> s_enc = recv_elgamal_msg();
+      cout << "after vector element" << endl;
 
       //T_enc.add_elem(s_enc, i);
 			T_enc.set_elem(s_enc, i, j);
+      cout << "after set element" << endl;
     }
   }
+
+  cout << "after double loop" << endl;
 
   return make_shared<Template_enc>(T_enc);
 }

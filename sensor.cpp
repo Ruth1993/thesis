@@ -111,14 +111,14 @@ shared_ptr<Template_enc> Sensor::encrypt_template(Template T) {
 	return make_shared<Template_enc>(T_enc);
 }
 
-shared_ptr<Template> Sensor::decrypt_template(Template_enc T_enc) {
-	pair<int, int> size = T_enc.size();
+shared_ptr<Template> Sensor::decrypt_template(shared_ptr<Template_enc> T_enc) {
+	pair<int, int> size = T_enc->size();
 
 	Template T(size, 0, 0);
 
 	for(int i=0; i<size.first; i++) {
 		for(int j=0; j<size.second; j++) {
-			shared_ptr<AsymmetricCiphertext> s_enc = T_enc.get_elem(i, j);
+			shared_ptr<AsymmetricCiphertext> s_enc = T_enc->get_elem(i, j);
 			shared_ptr<Plaintext> p_s = elgamal->decrypt(s_enc.get());
 			biginteger s = ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)p_s.get())->getElement()).get())->getElementValue();
 
@@ -389,26 +389,43 @@ int Sensor::usage() {
 *		Main function for semi-honest protocol
 */
 int Sensor::main_sh() {
-	//Receive public key from server
-	shared_ptr<PublicKey> pk_sv = recv_pk();
+	try {
+		//Receive public key from server
+		shared_ptr<PublicKey> pk_sv = recv_pk();
 
-	//Send own public key to Server
-	send_pk();
+		//Send own public key to Server
+		send_pk();
 
-	//Set shared public key
-	key_setup(pk_sv);
+		//Set shared public key
+		key_setup(pk_sv);
 
-	//Create enrollment parameters and send to server
-	int u = 1;
-	tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enrollment = enroll(u, template_size, min_s, max_s);
-	send_msg(get<0>(enrollment)); //send u
-	shared_ptr<AsymmetricCiphertext> test = get<2>(enrollment).first;
-	send_elgamal_msg(test);
-	vector<shared_ptr<AsymmetricCiphertext>> vec_test;
-	vec_test.push_back(test);
-	send_vec_enc(vec_test);
-	//send_template(get<1>(enrollment)); //send [[T_u]]
-	//shared_ptr<Template_enc> T_enc = recv_template();
+		//Create enrollment parameters and send to server
+		int u = 1;
+		tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enrollment = enroll(u, template_size, min_s, max_s);
+		send_msg(get<0>(enrollment)); //send u
+		shared_ptr<AsymmetricCiphertext> test = get<2>(enrollment).first;
+
+		shared_ptr<Plaintext> p_test = elgamal->decrypt(test.get());
+		cout << "test: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)p_test.get())->getElement()).get())->getElementValue() << endl;
+
+		send_elgamal_msg(test);
+		/*vector<shared_ptr<AsymmetricCiphertext>> vec_test;
+		vec_test.push_back(test);
+		send_vec_enc(vec_test);
+		vector<shared_ptr<AsymmetricCiphertext>> vec_test2 = recv_vec_enc(1);
+
+		for(shared_ptr<AsymmetricCiphertext> elem : vec_test2) {
+			shared_ptr<Plaintext> p_elem = elgamal->decrypt(elem.get());
+			cout << "elem: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)p_elem.get())->getElement()).get())->getElementValue() << endl;
+		}*/
+		//send_template(get<1>(enrollment)); //send [[T_u]]
+		//shared_ptr<Template_enc> T_enc = recv_template();
+		//shared_ptr<Template> T = decrypt_template(T_enc);
+		//T->print();
+	} catch (const logic_error& e) {
+			// Log error message in the exception object
+			cerr << e.what();
+	}
 
 	return 0;
 }

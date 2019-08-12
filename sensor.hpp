@@ -23,7 +23,7 @@ public:
 
 	shared_ptr<Template_enc> encrypt_template(Template T);
 
-	shared_ptr<Template> decrypt_template(Template_enc T_enc);
+	shared_ptr<Template> decrypt_template(shared_ptr<Template_enc> T_enc);
 
 	tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enroll(int u, pair<int, int> template_size, int min_s, int max_s);
 

@@ -40,8 +40,8 @@ int main(int argc, char* argv[]) {
 
     boost::asio::io_service io_service;
 
-    SocketPartyData p2 = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8001);
-    SocketPartyData p1 = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8000);
+    SocketPartyData p2 = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 7880);
+    SocketPartyData p1 = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 7831);
 
     shared_ptr<CommParty> channel = make_shared<CommPartyTCPSynced>(io_service, p2, p1);
 
@@ -87,6 +87,22 @@ int main(int argc, char* argv[]) {
 			string c_m_sendable_string = c_m_sendable->toString();
 			channel->writeWithSize(c_m_sendable_string);
 
+			/*//Send vec([[m]]) to party 1
+			auto m2 = dlog->createRandomElement();
+			cout << "m2: " << ((OpenSSLZpSafePrimeElement *)m2.get())->getElementValue() << endl;
+			GroupElementPlaintext p_m2(m2);
+			shared_ptr<AsymmetricCiphertext> c_m2 = elgamal.encrypt(make_shared<GroupElementPlaintext>(p_m2));
+			vector<shared_ptr<AsymmetricCiphertext>> vec;
+			vec.push_back(c_m);
+			vec.push_back(c_m2);
+
+			for(shared_ptr<AsymmetricCiphertext> elem : vec) {
+				shared_ptr<AsymmetricCiphertextSendableData> elem_sendable = ((ElGamalOnGroupElementCiphertext*) elem.get())->generateSendableData();
+				string elem_sendable_string = elem_sendable->toString();
+				channel->writeWithSize(elem_sendable_string);
+			}
+
+			//Commitment stuff
       auto dlog2 = make_shared<OpenSSLDlogECF2m>();
       shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog2);
 			shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog2);
@@ -109,7 +125,7 @@ int main(int argc, char* argv[]) {
 			biginteger r1 = *((biginteger *)result->getX().get());
 			biginteger r2 = *((biginteger *)r2_com->getX().get());
 			biginteger r = r1^r2;
-			cout << "r: " << r << endl;
+			cout << "r: " << r << endl;*/
     } catch (const logic_error& e) {
     		// Log error message in the exception object
     		cerr << e.what();

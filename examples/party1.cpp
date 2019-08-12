@@ -42,8 +42,8 @@ int main(int argc, char* argv[]) {
 
     boost::asio::io_service io_service;
 
-    SocketPartyData p1 = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8000);
-    SocketPartyData p2 = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8001);
+    SocketPartyData p1 = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 7831);
+    SocketPartyData p2 = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 7880);
 
     shared_ptr<CommParty> channel = make_shared<CommPartyTCPSynced>(io_service, p1, p2);
 
@@ -84,9 +84,21 @@ int main(int argc, char* argv[]) {
 			c_m_sendable->initFromByteVector(raw_msg);
 			shared_ptr<AsymmetricCiphertext> c_m = elgamal.reconstructCiphertext(c_m_sendable.get());
 
-			//Decrypt [m] and print on screen
+			/*//Decrypt [m] and print on screen
 			shared_ptr<Plaintext> p_m = elgamal.decrypt(c_m.get());
 			cout << "m: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)p_m.get())->getElement()).get())->getElementValue() << endl;
+
+			//Receive vec([[m]]) from party 2, decrypt and print on screen
+			for(int i=0; i<2; i++) {
+				shared_ptr<AsymmetricCiphertextSendableData> elem_sendable = make_shared<ElGamalOnGrElSendableData>(dlog->getGenerator()->generateSendableData(), dlog->getGenerator()->generateSendableData());
+				vector<byte> raw_msg;
+				channel->readWithSizeIntoVector(raw_msg);
+				elem_sendable->initFromByteVector(raw_msg);
+				shared_ptr<AsymmetricCiphertext> elem = elgamal.reconstructCiphertext(elem_sendable.get());
+
+				shared_ptr<Plaintext> p_elem = elgamal.decrypt(elem.get());
+				cout << "m: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)p_elem.get())->getElement()).get())->getElementValue() << endl;
+			}
 
 			//Basic Coin Tossing protocol
       auto dlog2 = make_shared<OpenSSLDlogECF2m>();
@@ -113,7 +125,7 @@ int main(int argc, char* argv[]) {
 			biginteger r2 = *((biginteger *)result->getX().get());
 			biginteger r1 = *((biginteger *)r1_com->getX().get());
 			biginteger r = r1^r2;
-			cout << "r: " << r << endl;
+			cout << "r: " << r << endl;*/
     } catch (const logic_error& e) {
     		// Log error message in the exception object
     		cerr << e.what();

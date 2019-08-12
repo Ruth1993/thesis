@@ -293,9 +293,16 @@ int Server::main_sh() {
 		string u = recv_msg(); //receive u
 		cout << "u: " << u << endl;
 		shared_ptr<AsymmetricCiphertext> test = recv_elgamal_msg();
-		cout << "after elgamal msg" << endl;
-		vector<shared_ptr<AsymmetricCiphertext>> vec_test = recv_vec_enc(1);
+
+		//vector<shared_ptr<AsymmetricCiphertext>> vec_test = recv_vec_enc(1);
+		//send_vec_enc(vec_test);
+
 		//shared_ptr<Template_enc> T_enc = recv_template(); //receive [[T_u]]
+
+
+		//cout << "after recv_template()" << endl;
+
+		//send_template(T_enc);
 		//send_template(T_enc);
 
 
