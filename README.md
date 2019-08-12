@@ -6,16 +6,24 @@ Install instructions:
 - Install libscapi as on: https://github.com/cryptobiu/libscapi/blob/master/build_scripts/INSTALL.md.
 - To check if the installation was successful, build and run the tests as on: https://biulibscapi.readthedocs.io/en/latest/install.html
 
+For the installation of the malicious key release protocol, please carry out the additional steps:
+- cd ~/libscapi/include/primitives/Dlog.hpp
+- Change line 811 and/or line 813 to the correct file path or copy NISTEC.txt to the specified location. In case folders thesis and libscapi are located in the same folder, change line 811 or 813 (depending on the OS you're using) to: const string NISTEC_PROPERTIES_FILE = "../../libscapi/include/configFiles/NISTEC.txt";
+- cd ../..
+- make
+
+
 The code has been tested and found working on Ubuntu 16.04 with OpenSSL 1.0.2g.
 
 Compile:
- - make
+- ~/thesis
+- make
 
 Run:
 - ./semihonest_key
 
 Interpretation of the output:
-- For interpretation of the code, send me a message and I will send you my master thesis paper (WIP), which explains the protocol that I implemented
+- For interpretation of the code, send me a message and I will send you my master thesis paper (WIP), which explains the protocol that I implemented.
 - For simplicity reasons, we output both the output of the sensor and the server in one window.
 - If the verification procedure was successful, a key will be printed. In case the verification was unsuccessful, the key will be 1.
 - In the enrollment procedure, a template T_u belonging to identity u will be created and in the verification procedure, a probe vector vec_p will be created, which are printed, so you can manually check if the selected scores add up to exceeding the threshold. For each column j in T_u, vec_p[j] selects the row containing the partial similarity score.

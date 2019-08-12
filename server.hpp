@@ -3,46 +3,25 @@
 
 #include <vector>
 #include <array>
+#include <string>
 
-#include "template.hpp"
 #include "table.hpp"
-
-#include "../libscapi/include/mid_layer/OpenSSLSymmetricEnc.hpp"
-#include "../libscapi/include/primitives/DlogOpenSSL.hpp"
-#include "../libscapi/include/mid_layer/ElGamalEnc.hpp"
-#include "../libscapi/include/infra/Scanner.hpp"
-#include "../libscapi/include/infra/ConfigFile.hpp"
-#include "../libscapi/include/comm/Comm.hpp"
-#include "../libscapi/include/infra/Common.hpp"
-#include "../libscapi/include/interactive_mid_protocols/CommitmentScheme.hpp"
-#include "../libscapi/include/interactive_mid_protocols/CommitmentSchemePedersen.hpp"
-
-#include <boost/thread/thread.hpp>
+#include "party.hpp"
 
 using namespace std;
 
-class Server {
+class Server : public Party {
 private:
-	//Channel object
-	shared_ptr<CommParty> channel;
-
-	//ElGamal and AES objects
-	shared_ptr<OpenSSLCTREncRandomIV> aes_enc;
- 	shared_ptr<OpenSSLDlogZpSafePrime> dlog;
-	shared_ptr<ElGamalOnGroupElementEnc> elgamal;
-
-	shared_ptr<PrivateKey> sk_sv;
-	shared_ptr<PublicKey> pk_shared;
+	//Protocol parameters
+	const biginteger t = 15;
 
 	//Table
 	Table table;
 
+
+
 public:
-	Server(shared_ptr<OpenSSLDlogZpSafePrime> dlogg);
-
-	shared_ptr<PublicKey> key_gen();
-
-	void key_setup(shared_ptr<PublicKey> pk_ss);
+	Server(string config_file_path);
 
 	void store_table(tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enrollment);
 
@@ -75,6 +54,6 @@ public:
 	int main_mal();
 };
 
-int main_sv(int argc, char* argv[]);
+int main(int argc, char* argv[]);
 
 #endif

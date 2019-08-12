@@ -3,53 +3,17 @@
 
 #include <vector>
 #include <tuple>
+#include <string>
 
-#include "template.hpp"
-
-#include "../libscapi/include/mid_layer/OpenSSLSymmetricEnc.hpp"
-#include "../libscapi/include/primitives/DlogOpenSSL.hpp"
-#include "../libscapi/include/mid_layer/ElGamalEnc.hpp"
-#include "../libscapi/include/infra/Scanner.hpp"
-#include "../libscapi/include/infra/ConfigFile.hpp"
-#include "../libscapi/include/comm/Comm.hpp"
-#include "../libscapi/include/infra/Common.hpp"
-#include "../libscapi/include/interactive_mid_protocols/CommitmentScheme.hpp"
-#include "../libscapi/include/interactive_mid_protocols/CommitmentSchemePedersen.hpp"
-
-#include <boost/thread/thread.hpp>
+#include "party.hpp"
 
 using namespace std;
 
-class Sensor {
-private:
-	//Channel object
-	shared_ptr<CommParty> channel;
-
-	//ElGamal and AES objects
-	shared_ptr<OpenSSLCTREncRandomIV> aes_enc;
- 	shared_ptr<OpenSSLDlogZpSafePrime> dlog;
-	shared_ptr<ElGamalOnGroupElementEnc> elgamal;
-
-	shared_ptr<PublicKey> pk_ss;
-	shared_ptr<PublicKey> pk_shared;
-	shared_ptr<PrivateKey> sk_ss;
-
+class Sensor : public Party {
 public:
-	Sensor(shared_ptr<OpenSSLDlogZpSafePrime> dlogg);
-
-	shared_ptr<PublicKey> key_gen();
-
-	void key_setup(shared_ptr<PublicKey> pk_sv);
+	Sensor(string config_file_path);
 
 	void test_decrypt(shared_ptr<ElGamalOnGroupElementCiphertext> cipher);
-
-	vector<unsigned char> int_to_byte(int a);
-
-	vector<unsigned char> int_to_byte(int a, int len);
-
-	int byte_to_int(vector<unsigned char> vec);
-
-	void pad(vector<unsigned char> &input, int bytes);
 
 	void elgamal_setup();
 
@@ -58,6 +22,8 @@ public:
 	pair<int, vector<int>> capture(pair<int, int> template_size);
 
 	shared_ptr<Template_enc> encrypt_template(Template T);
+
+	shared_ptr<Template> decrypt_template(Template_enc T_enc);
 
 	tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enroll(int u, pair<int, int> template_size, int min_s, int max_s);
 
@@ -86,6 +52,6 @@ public:
 	int main_mal();
 };
 
-int main_ss(int argc, char* argv[]);
+int main(int argc, char* argv[]);
 
 #endif

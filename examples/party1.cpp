@@ -88,13 +88,32 @@ int main(int argc, char* argv[]) {
 			shared_ptr<Plaintext> p_m = elgamal.decrypt(c_m.get());
 			cout << "m: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)p_m.get())->getElement()).get())->getElementValue() << endl;
 
-      /*auto dlog = make_shared<OpenSSLDlogECF2m>();
-      shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog);
+			//Basic Coin Tossing protocol
+      auto dlog2 = make_shared<OpenSSLDlogECF2m>();
+      shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog2);
+			shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog2);
 
-      auto val = committer->sampleRandomCommitValue();
-      cout << "the committed value is:" << val->toString() << endl;
-      committer->commit(val, 0);
-      committer->decommit(0);*/
+			auto r1_com = committer->sampleRandomCommitValue();
+      cout << "the committed value is:" << r1_com->toString() << endl;
+
+			auto commitment = receiver->receiveCommitment();
+
+      committer->commit(r1_com, 0);
+
+			auto result = receiver->receiveDecommitment(1);
+
+      committer->decommit(0);
+
+			if (result == NULL) {
+				cout << "commitment failed" << endl;
+			} else {
+				cout << "the committed value is:" << result->toString() << endl;
+			}
+
+			biginteger r2 = *((biginteger *)result->getX().get());
+			biginteger r1 = *((biginteger *)r1_com->getX().get());
+			biginteger r = r1^r2;
+			cout << "r: " << r << endl;
     } catch (const logic_error& e) {
     		// Log error message in the exception object
     		cerr << e.what();

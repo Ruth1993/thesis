@@ -87,16 +87,29 @@ int main(int argc, char* argv[]) {
 			string c_m_sendable_string = c_m_sendable->toString();
 			channel->writeWithSize(c_m_sendable_string);
 
-      /*auto dlog = make_shared<OpenSSLDlogECF2m>();
-      shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog);
+      auto dlog2 = make_shared<OpenSSLDlogECF2m>();
+      shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog2);
+			shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog2);
 
-      auto commitment = receiver->receiveCommitment();
+			auto r2_com = committer->sampleRandomCommitValue();
+      cout << "the committed value is:" << r2_com->toString() << endl;
+      committer->commit(r2_com, 1);
+
+			auto commitment = receiver->receiveCommitment();
+
+      committer->decommit(1);
+
       auto result = receiver->receiveDecommitment(0);
       if (result == NULL) {
         cout << "commitment failed" << endl;
       } else {
         cout << "the committed value is:" << result->toString() << endl;
-      }*/
+      }
+
+			biginteger r1 = *((biginteger *)result->getX().get());
+			biginteger r2 = *((biginteger *)r2_com->getX().get());
+			biginteger r = r1^r2;
+			cout << "r: " << r << endl;
     } catch (const logic_error& e) {
     		// Log error message in the exception object
     		cerr << e.what();

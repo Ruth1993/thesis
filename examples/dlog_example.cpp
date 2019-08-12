@@ -1,16 +1,17 @@
-/* 
+/*
 * Copyright (c) 2016 LIBSCAPI (http://crypto.biu.ac.il/SCAPI)
 */
 
-#include "../libscapi/include/primitives/DlogOpenSSL.hpp"
-#include "../libscapi/include/mid_layer/ElGamalEnc.hpp"
+#include "../../libscapi/include/primitives/DlogOpenSSL.hpp"
+#include "../../libscapi/include/mid_layer/ElGamalEnc.hpp"
 #include <iostream>
 #include <vector>
 
 int main(int argc, char* argv[]){
   // initiate a discrete log group
 	// (in this case the OpenSSL implementation of the elliptic curve group K-233)
-	auto dlog = make_shared<OpenSSLDlogZpSafePrime>(128);
+	auto dlog1 = make_shared<OpenSSLDlogZpSafePrime>(128);
+	auto dlog = make_shared<OpenSSLDlogECF2m>();
 
 	// get the group generator and order
 	auto g = dlog->getGenerator();

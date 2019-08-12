@@ -12,7 +12,7 @@ using namespace std;
 
 class Template {
 private:
-  int b;
+  int two_pow_b;
   int k;
 
 public:
@@ -20,9 +20,7 @@ public:
 
   Template(pair<int, int> size, biginteger min_s, biginteger max_s);
 
-  Template();
-
-  int get_b();
+  int get_two_pow_b();
 
   int get_k();
 
@@ -30,20 +28,36 @@ public:
 
   biginteger get(int i, int j);
 
+  void add_col(vector<biginteger> vec_col);
+
+  void add_elem(biginteger elem, int i);
+
+  void set_elem(biginteger elem, int i, int j);
+
   void print();
 
   pair<int, int> size();
 };
 
 class Template_enc {
-  public:
-    vector<vector<shared_ptr<AsymmetricCiphertext>>> T_enc;
-
-  void add_col(vector<shared_ptr<AsymmetricCiphertext>> vec_col_enc);
+public:
+  vector<vector<shared_ptr<AsymmetricCiphertext>>> T_enc;
 
   pair<int, int> size();
 
   shared_ptr<AsymmetricCiphertext> get_elem(int i, int j);
+
+  vector<shared_ptr<AsymmetricCiphertext>> get_col(int i);
+
+  void add_col(vector<shared_ptr<AsymmetricCiphertext>> vec_col_enc);
+
+  void add_elem(shared_ptr<AsymmetricCiphertext> elem, int i);
+
+  void set_elem(shared_ptr<AsymmetricCiphertext> elem, int i, int j);
+
+  Template_enc();
+
+  Template_enc(pair<int, int> size);
 };
 
 int main_tp();

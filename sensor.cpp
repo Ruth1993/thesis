@@ -10,77 +10,40 @@
 
 using namespace std;
 
-Sensor::Sensor(shared_ptr<OpenSSLDlogZpSafePrime> dlogg) {
+Sensor::Sensor(string config_file_path) {
+	//First set up channel
+	boost::asio::io_service io_service;
+
+	SocketPartyData server = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8000);
+	SocketPartyData sensor = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8001);
+
+	channel = make_shared<CommPartyTCPSynced>(io_service, sensor, server);
+
+	//Initialize encryption objects
 	aes_enc = make_shared<OpenSSLCTREncRandomIV>("AES");
 
-	dlog = dlogg;
+	ConfigFile cf(config_file_path);
+	string p = cf.Value("", "p");
+	string g = cf.Value("", "g");
+	string q = cf.Value("", "q");
+	dlog = make_shared<OpenSSLDlogZpSafePrime>(q, g, p);
 	elgamal = make_shared<ElGamalOnGroupElementEnc>(dlog);
 
-	auto g = dlog->getGenerator();
-	biginteger q = dlog->getOrder();
-}
-
-/*
-*		Generate ElGamal key pair
-*/
-shared_ptr<PublicKey> Sensor::key_gen() {
+	//Generate ElGamal keypair
 	auto pair = elgamal->generateKey();
 
-	pk_ss = pair.first;
-	sk_ss = pair.second;
+	pk_own = pair.first;
+	sk_own = pair.second;
 
-	elgamal->setKey(pk_ss, sk_ss);
+	elgamal->setKey(pk_own, sk_own);
 
-	return pk_ss;
-}
-
-/*
-*		Setup shared public key for double encryption
-*/
-void Sensor::key_setup(shared_ptr<PublicKey> pk_sv) {
-	shared_ptr<GroupElement> h_shared = dlog->exponentiate(((ElGamalPublicKey*) pk_sv.get())->getH().get(), ((ElGamalPrivateKey*) sk_ss.get())->getX());
-
-	pk_shared = make_shared<ElGamalPublicKey>(ElGamalPublicKey(h_shared));
-
-	elgamal->setKey(pk_shared);
-}
-
-/*
-*		Convert an integer to byte array
-*/
-vector<unsigned char> Sensor::int_to_byte(int a) {
-  vector<unsigned char> result(4);
-
-  for(int i=0; i<4; i++) {
-    result[i] = (a >> (8*(3-i)));
-  }
-
-  return result;
-}
-
-/*
-*	 Convert a byte array to integer
-*/
-int Sensor::byte_to_int(vector<unsigned char> vec) {
-  int result = 0;
-
-  for(int i=0; i<vec.size(); i++) {
-    result = (result << 8) + vec[i];
-  }
-
-  return result;
-}
-
-/*
-*		Pad input with zeros (least significant bits) to match number of bits
-*/
-void Sensor::pad(vector<unsigned char> &input, int bits) {
-	int i = bits-input.size()*8;
-	if(i > 0) {
-		for(int j = 0; j<i; j+=8) {
-			vector<unsigned char> byte_zeros = int_to_byte(0);
-			input.push_back(byte_zeros[0]);
-		}
+	//Join channel
+	try {
+		channel->join(500, 5000);
+		cout << "channel established" << endl;
+	} catch (const logic_error& e) {
+			//Log error message in the exception object
+			cerr << e.what();
 	}
 }
 
@@ -146,6 +109,24 @@ shared_ptr<Template_enc> Sensor::encrypt_template(Template T) {
 	}
 
 	return make_shared<Template_enc>(T_enc);
+}
+
+shared_ptr<Template> Sensor::decrypt_template(Template_enc T_enc) {
+	pair<int, int> size = T_enc.size();
+
+	Template T(size, 0, 0);
+
+	for(int i=0; i<size.first; i++) {
+		for(int j=0; j<size.second; j++) {
+			shared_ptr<AsymmetricCiphertext> s_enc = T_enc.get_elem(i, j);
+			shared_ptr<Plaintext> p_s = elgamal->decrypt(s_enc.get());
+			biginteger s = ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)p_s.get())->getElement()).get())->getElementValue();
+
+			T.set_elem(s, i, j);
+		}
+	}
+
+	return make_shared<Template>(T);
 }
 
 /*
@@ -284,7 +265,7 @@ shared_ptr<GroupElement> Sensor::check_key(vector<shared_ptr<GroupElement>> vec_
 void Sensor::test_look_up() {
 	auto g = dlog->getGenerator();
 
-	Template T;
+	Template T(template_size, min_s, max_s);
 	T.print();
 
 	shared_ptr<Template_enc> T_enc = encrypt_template(T);
@@ -393,35 +374,71 @@ void Sensor::print_outcomes(int total) {
 	}
 }
 
+/*
+*		Show usage of the program
+*/
 int Sensor::usage() {
 	cout << "Usage: " << endl;
-	cout << "*	Semi-honest protocol with key release: ./sensor| ./sensor sh" << endl;
+	cout << "*	Semi-honest protocol with key release: ./sensor | ./sensor sh" << endl;
 	cout << "*	Malicious protocol with key release: ./sensor mal" << endl;
 
 	return 0;
 }
 
+/*
+*		Main function for semi-honest protocol
+*/
 int Sensor::main_sh() {
-	cout << "sh test" << endl;
+	//Receive public key from server
+	shared_ptr<PublicKey> pk_sv = recv_pk();
 
-	/*//First join channel
-	try {
-		channel->join(500, 5000);
-		cout << "channel established" << endl;
-	} catch (const logic_error& e) {
-			//Log error message in the exception object
-			cerr << e.what();
-	}*/
+	//Send own public key to Server
+	send_pk();
+
+	//Set shared public key
+	key_setup(pk_sv);
+
+	//Create enrollment parameters and send to server
+	int u = 1;
+	tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enrollment = enroll(u, template_size, min_s, max_s);
+	send_msg(get<0>(enrollment)); //send u
+	shared_ptr<AsymmetricCiphertext> test = get<2>(enrollment).first;
+	send_elgamal_msg(test);
+	vector<shared_ptr<AsymmetricCiphertext>> vec_test;
+	vec_test.push_back(test);
+	send_vec_enc(vec_test);
+	//send_template(get<1>(enrollment)); //send [[T_u]]
+	//shared_ptr<Template_enc> T_enc = recv_template();
 
 	return 0;
 }
 
+/*
+*		Main function for malicious protocol
+*/
 int Sensor::main_mal() {
 	cout << "not yet implemented" << endl;
 	return 0;
 }
 
-int main_ss(int argc, char* argv[]) {
-	cout << "test sensor" << endl;
+/*
+*		General main function
+*/
+int main(int argc, char* argv[]) {
+	Sensor ss = Sensor("dlog_params.txt");
+
+	if(argc == 1) {
+		return ss.main_sh();
+	} else if(argc == 2) {
+	string arg(argv[1]);
+		if(arg == "sh") {
+			return ss.main_sh();
+		} else if(arg == "mal") {
+			return ss.main_mal();
+		}
+	}
+
+	return ss.usage();
+
 	return 0;
 }

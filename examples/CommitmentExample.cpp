@@ -49,14 +49,16 @@ void CommitmentUsage() {
 }
 
 shared_ptr<CmtCommitter> getCommitter(shared_ptr<CommParty> channel) {
-	auto dlog = make_shared<OpenSSLDlogECF2m>();
+	//auto dlog = make_shared<OpenSSLDlogECF2m>();
+	auto dlog = make_shared<OpenSSLDlogZpSafePrime>(128);
 	shared_ptr<CmtCommitter> sds = make_shared<CmtPedersenCommitter>(channel, dlog);
 
 	return sds;
 }
 
 shared_ptr<CmtReceiver> getReceiver(shared_ptr<CommParty> channel) {
-	auto dlog = make_shared<OpenSSLDlogECF2m>();
+	//auto dlog = make_shared<OpenSSLDlogECF2m>();
+		auto dlog = make_shared<OpenSSLDlogZpSafePrime>(128);
 	shared_ptr<CmtReceiver>	sds = make_shared<CmtPedersenReceiver>(channel, dlog);
 
 	return sds;
