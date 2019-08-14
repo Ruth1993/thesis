@@ -7,6 +7,9 @@
 #include "../../libscapi/include/mid_layer/ElGamalEnc.hpp"
 #include "../../libscapi/include/infra/Scanner.hpp"
 #include "../../libscapi/include/infra/ConfigFile.hpp"
+#include "../../libscapi/include/interactive_mid_protocols/SigmaProtocol.hpp"
+#include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolDlog.hpp"
+#include "../../libscapi/include/interactive_mid_protocols/ZeroKnowledge.hpp"
 
 #include <boost/thread/thread.hpp>
 
@@ -50,10 +53,11 @@ int main(int argc, char* argv[]) {
     //setup ElGamal communication
 		//First read Dlog parameters from file dlog_params.txt
 		ConfigFile cf("dlog_params.txt");
-		string p = cf.Value("", "p");
-		string g = cf.Value("", "g");
-		string q = cf.Value("", "q");
-    auto dlog = make_shared<OpenSSLDlogZpSafePrime>(q, g, p);
+		string p_string = cf.Value("", "p");
+		string g_string = cf.Value("", "g");
+		string q_string = cf.Value("", "q");
+    auto dlog = make_shared<OpenSSLDlogZpSafePrime>(q_string, g_string, p_string);
+		auto g = dlog->getGenerator();
     ElGamalOnGroupElementEnc elgamal(dlog);
     auto pair = elgamal.generateKey();
     elgamal.setKey(pair.first, pair.second);
@@ -99,6 +103,14 @@ int main(int argc, char* argv[]) {
 				shared_ptr<Plaintext> p_elem = elgamal.decrypt(elem.get());
 				cout << "m: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)p_elem.get())->getElement()).get())->getElementValue() << endl;
 			}
+
+			//Zero-knowledge proof stuff
+			ZKFromSigmaProver prover(channel, make_shared<SigmaDlogProverComputation>(dlog, 40, get_seeded_prg()));
+			biginteger q = dlog->getOrder();
+			biginteger r = getRandomInRange(0, q-1, get_seeded_prg().get());
+			auto co = dlog->exponentiate(g.get(), r);
+			shared_ptr<SigmaDlogProverInput> input = make_shared<SigmaDlogProverInput>(co, r);
+			prover.prove(input);
 
 			//Basic Coin Tossing protocol
       /*auto dlog2 = make_shared<OpenSSLDlogECF2m>();

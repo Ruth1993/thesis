@@ -2,6 +2,10 @@
 #include "../../libscapi/include/interactive_mid_protocols/CommitmentScheme.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/CommitmentSchemePedersen.hpp"
 
+#include "../../libscapi/include/interactive_mid_protocols/SigmaProtocol.hpp"
+#include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolDlog.hpp"
+#include "../../libscapi/include/interactive_mid_protocols/ZeroKnowledge.hpp"
+
 #include "../../libscapi/include/mid_layer/OpenSSLSymmetricEnc.hpp"
 #include "../../libscapi/include/primitives/DlogOpenSSL.hpp"
 #include "../../libscapi/include/mid_layer/ElGamalEnc.hpp"
@@ -101,6 +105,14 @@ int main(int argc, char* argv[]) {
 				string elem_sendable_string = elem_sendable->toString();
 				channel->writeWithSize(elem_sendable_string);
 			}
+
+			//Zero-knowledge proof stuff
+			ZKFromSigmaVerifier verifier(channel, make_shared<SigmaDlogVerifierComputation>(dlog, 40, get_seeded_prg()), get_seeded_prg());
+			auto ch = dlog->createRandomElement();
+			auto msgA = make_shared<SigmaGroupElementMsg>(dlog->getIdentity()->generateSendableData());
+			auto msgZ = make_shared<SigmaBIMsg>();
+			shared_ptr<SigmaDlogCommonInput> input = make_shared<SigmaDlogCommonInput>(ch);
+			cout << verifier.verify(input.get(), msgA, msgZ) << endl;
 
 			//Commitment stuff
       /*auto dlog2 = make_shared<OpenSSLDlogECF2m>();
