@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
 			c_m_sendable->initFromByteVector(raw_msg);
 			shared_ptr<AsymmetricCiphertext> c_m = elgamal.reconstructCiphertext(c_m_sendable.get());
 
-			/*//Decrypt [m] and print on screen
+			//Decrypt [m] and print on screen
 			shared_ptr<Plaintext> p_m = elgamal.decrypt(c_m.get());
 			cout << "m: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)p_m.get())->getElement()).get())->getElementValue() << endl;
 
@@ -101,7 +101,7 @@ int main(int argc, char* argv[]) {
 			}
 
 			//Basic Coin Tossing protocol
-      auto dlog2 = make_shared<OpenSSLDlogECF2m>();
+      /*auto dlog2 = make_shared<OpenSSLDlogECF2m>();
       shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog2);
 			shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog2);
 

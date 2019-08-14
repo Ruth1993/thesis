@@ -10,14 +10,6 @@
 using namespace std;
 
 Server::Server(string config_file_path) {
-	//First set up channel
-	boost::asio::io_service io_service;
-
-	SocketPartyData server = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8000);
-	SocketPartyData sensor = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8001);
-
-	channel = make_shared<CommPartyTCPSynced>(io_service, server, sensor);
-
 	//Intialize encryption objects
 	aes_enc = make_shared<OpenSSLCTREncRandomIV>("AES");
 
@@ -35,15 +27,6 @@ Server::Server(string config_file_path) {
 	sk_own = pair.second;
 
 	elgamal->setKey(pk_own, sk_own);
-
-	//Join channel
-	try {
-		channel->join(500, 5000);
-		cout << "channel established" << endl;
-	} catch (const logic_error& e) {
-			//Log error message in the exception object
-			cerr << e.what();
-	}
 }
 
 /*
@@ -280,6 +263,20 @@ int Server::usage() {
 
 int Server::main_sh() {
 	try {
+		//First set up channel
+		boost::asio::io_service io_service;
+
+		SocketPartyData server = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8000);
+		SocketPartyData sensor = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8001);
+
+		channel = make_shared<CommPartyTCPSynced>(io_service, server, sensor);
+
+		boost::thread t(boost::bind(&boost::asio::io_service::run, &io_service));
+
+		//Join channel
+		channel->join(500, 5000);
+		cout << "channel established" << endl;
+
 		//First send public key
 		send_pk();
 
@@ -294,17 +291,13 @@ int Server::main_sh() {
 		cout << "u: " << u << endl;
 		shared_ptr<AsymmetricCiphertext> test = recv_elgamal_msg();
 
-		//vector<shared_ptr<AsymmetricCiphertext>> vec_test = recv_vec_enc(1);
-		//send_vec_enc(vec_test);
+		shared_ptr<Template_enc> T_enc = recv_template(); //receive [[T_u]]
 
-		//shared_ptr<Template_enc> T_enc = recv_template(); //receive [[T_u]]
+		shared_ptr<SymmetricCiphertext> aes_k_1 = recv_aes_msg();
+		//send_aes_msg(aes_k_1);
 
-
-		//cout << "after recv_template()" << endl;
-
-		//send_template(T_enc);
-		//send_template(T_enc);
-
+		io_service.stop();
+		t.join();
 
 	} catch (const logic_error& e) {
 			// Log error message in the exception object

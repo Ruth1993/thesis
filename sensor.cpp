@@ -11,14 +11,6 @@
 using namespace std;
 
 Sensor::Sensor(string config_file_path) {
-	//First set up channel
-	boost::asio::io_service io_service;
-
-	SocketPartyData server = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8000);
-	SocketPartyData sensor = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8001);
-
-	channel = make_shared<CommPartyTCPSynced>(io_service, sensor, server);
-
 	//Initialize encryption objects
 	aes_enc = make_shared<OpenSSLCTREncRandomIV>("AES");
 
@@ -36,15 +28,6 @@ Sensor::Sensor(string config_file_path) {
 	sk_own = pair.second;
 
 	elgamal->setKey(pk_own, sk_own);
-
-	//Join channel
-	try {
-		channel->join(500, 5000);
-		cout << "channel established" << endl;
-	} catch (const logic_error& e) {
-			//Log error message in the exception object
-			cerr << e.what();
-	}
 }
 
 /*
@@ -390,6 +373,20 @@ int Sensor::usage() {
 */
 int Sensor::main_sh() {
 	try {
+		//First set up channel
+		boost::asio::io_service io_service;
+
+		SocketPartyData server = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8000);
+		SocketPartyData sensor = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8001);
+
+		channel = make_shared<CommPartyTCPSynced>(io_service, sensor, server);
+
+		boost::thread t(boost::bind(&boost::asio::io_service::run, &io_service));
+
+		//Join channel
+		channel->join(500, 5000);
+		cout << "channel established" << endl;
+
 		//Receive public key from server
 		shared_ptr<PublicKey> pk_sv = recv_pk();
 
@@ -418,10 +415,19 @@ int Sensor::main_sh() {
 			shared_ptr<Plaintext> p_elem = elgamal->decrypt(elem.get());
 			cout << "elem: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)p_elem.get())->getElement()).get())->getElementValue() << endl;
 		}*/
-		//send_template(get<1>(enrollment)); //send [[T_u]]
-		//shared_ptr<Template_enc> T_enc = recv_template();
-		//shared_ptr<Template> T = decrypt_template(T_enc);
-		//T->print();
+		shared_ptr<Template_enc> T_enc = get<1>(enrollment);
+		send_template(T_enc); //send [[T_u]]
+
+		shared_ptr<SymmetricCiphertext> aes_k_1 = get<2>(enrollment).second;
+		send_aes_msg(aes_k_1);
+		//shared_ptr<SymmetricCiphertext> aes_k_1_2 = recv_aes_msg();
+		//shared_ptr<Plaintext> decryption = aes_enc->decrypt((IVCiphertext*) aes_k_1_2.get());
+		//biginteger decryption_int = byte_to_int(((ByteArrayPlaintext *)decryption.get())->getText());
+
+		//cout << "AES_k(1) decrypted: " << decryption_int << endl;
+
+		io_service.stop();
+		t.join();
 	} catch (const logic_error& e) {
 			// Log error message in the exception object
 			cerr << e.what();

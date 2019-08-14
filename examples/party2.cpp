@@ -87,7 +87,7 @@ int main(int argc, char* argv[]) {
 			string c_m_sendable_string = c_m_sendable->toString();
 			channel->writeWithSize(c_m_sendable_string);
 
-			/*//Send vec([[m]]) to party 1
+			//Send vec([[m]]) to party 1
 			auto m2 = dlog->createRandomElement();
 			cout << "m2: " << ((OpenSSLZpSafePrimeElement *)m2.get())->getElementValue() << endl;
 			GroupElementPlaintext p_m2(m2);
@@ -103,7 +103,7 @@ int main(int argc, char* argv[]) {
 			}
 
 			//Commitment stuff
-      auto dlog2 = make_shared<OpenSSLDlogECF2m>();
+      /*auto dlog2 = make_shared<OpenSSLDlogECF2m>();
       shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog2);
 			shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog2);
 

@@ -170,16 +170,11 @@ shared_ptr<AsymmetricCiphertext> Party::recv_elgamal_msg() {
 *   Receive symmetric ciphertext from the other party
 */
 shared_ptr<SymmetricCiphertext> Party::recv_aes_msg() {
-  shared_ptr<SymmetricCiphertext> c_m;
+  shared_ptr<IVCiphertext> c_m;
 
-	/*try {
-		vector<byte> raw_msg;
-		channel->readWithSizeIntoVector(raw_msg);
-		c_m = ByteArraySymCiphertext(raw_msg);
-	} catch (const logic_error& e) {
-			// Log error message in the exception object
-			cerr << e.what();
-	}*/
+  vector<byte> raw_msg;
+	channel->readWithSizeIntoVector(raw_msg);
+  c_m->initFromByteVector(raw_msg);
 
   return c_m;
 }
