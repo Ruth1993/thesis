@@ -107,19 +107,21 @@ int main(int argc, char* argv[]) {
 			}
 
 			//Zero-knowledge proof stuff
-			ZKFromSigmaVerifier verifier(channel, make_shared<SigmaDlogVerifierComputation>(dlog, 40, get_seeded_prg()), get_seeded_prg());
+			/*ZKFromSigmaVerifier verifier(channel, make_shared<SigmaDlogVerifierComputation>(dlog, 40, get_seeded_prg()), get_seeded_prg());
 			auto ch = dlog->createRandomElement();
 			auto msgA = make_shared<SigmaGroupElementMsg>(dlog->getIdentity()->generateSendableData());
 			auto msgZ = make_shared<SigmaBIMsg>();
 			shared_ptr<SigmaDlogCommonInput> input = make_shared<SigmaDlogCommonInput>(ch);
-			cout << verifier.verify(input.get(), msgA, msgZ) << endl;
+			cout << verifier.verify(input.get(), msgA, msgZ) << endl;*/
 
 			//Commitment stuff
       /*auto dlog2 = make_shared<OpenSSLDlogECF2m>();
       shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog2);
 			shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog2);
 
-			auto r2_com = committer->sampleRandomCommitValue();
+			biginteger b = getRandomInRange(0, 1, get_seeded_prg().get());
+			auto r2_com = make_shared<CmtBigIntegerCommitValue>(make_shared<biginteger>(b));
+			//auto r2_com = committer->sampleRandomCommitValue();
       cout << "the committed value is:" << r2_com->toString() << endl;
       committer->commit(r2_com, 1);
 
@@ -137,11 +139,11 @@ int main(int argc, char* argv[]) {
 			biginteger r1 = *((biginteger *)result->getX().get());
 			biginteger r2 = *((biginteger *)r2_com->getX().get());
 			biginteger r = r1^r2;
-			cout << "r: " << r << endl;*/
+			cout << "r: " << r << endl;
     } catch (const logic_error& e) {
     		// Log error message in the exception object
     		cerr << e.what();
-    }
+    }*/
 
     return 0;
 }

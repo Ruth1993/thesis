@@ -105,19 +105,21 @@ int main(int argc, char* argv[]) {
 			}
 
 			//Zero-knowledge proof stuff
-			ZKFromSigmaProver prover(channel, make_shared<SigmaDlogProverComputation>(dlog, 40, get_seeded_prg()));
+			/*ZKFromSigmaProver prover(channel, make_shared<SigmaDlogProverComputation>(dlog, 40, get_seeded_prg()));
 			biginteger q = dlog->getOrder();
 			biginteger r = getRandomInRange(0, q-1, get_seeded_prg().get());
 			auto co = dlog->exponentiate(g.get(), r);
 			shared_ptr<SigmaDlogProverInput> input = make_shared<SigmaDlogProverInput>(co, r);
-			prover.prove(input);
+			prover.prove(input);*/
 
 			//Basic Coin Tossing protocol
       /*auto dlog2 = make_shared<OpenSSLDlogECF2m>();
       shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog2);
 			shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog2);
 
-			auto r1_com = committer->sampleRandomCommitValue();
+			biginteger b = getRandomInRange(0, 1, get_seeded_prg().get());
+			auto r1_com = make_shared<CmtBigIntegerCommitValue>(make_shared<biginteger>(b));
+			//auto r1_com = committer->sampleRandomCommitValue();
       cout << "the committed value is:" << r1_com->toString() << endl;
 
 			auto commitment = receiver->receiveCommitment();
@@ -137,11 +139,11 @@ int main(int argc, char* argv[]) {
 			biginteger r2 = *((biginteger *)result->getX().get());
 			biginteger r1 = *((biginteger *)r1_com->getX().get());
 			biginteger r = r1^r2;
-			cout << "r: " << r << endl;*/
+			cout << "r: " << r << endl;
     } catch (const logic_error& e) {
     		// Log error message in the exception object
     		cerr << e.what();
-    }
+    }*/
 
     return 0;
 }

@@ -4,6 +4,7 @@
 
 #include "../../libscapi/include/primitives/DlogOpenSSL.hpp"
 #include "../../libscapi/include/mid_layer/ElGamalEnc.hpp"
+#include "../../libscapi/include/infra/Common.hpp"
 #include <iostream>
 #include <vector>
 
@@ -19,10 +20,10 @@ int main(int argc, char* argv[]){
 
 	// create a random exponent r
 	auto gen = get_seeded_prg();
-	biginteger r = getRandomInRange(0, q-1, gen.get());
+	biginteger x = getRandomInRange(0, q-1, gen.get());
 
 	// exponentiate g in r to receive a new group element
-	auto g1 = dlog->exponentiate(g.get(), r);
+	auto g1 = dlog->exponentiate(g.get(), x);
 	// create a random group element
 	auto h = dlog->createRandomElement();
 	// multiply elements
@@ -43,13 +44,46 @@ int main(int argc, char* argv[]){
   shared_ptr<AsymmetricCiphertext> cipher = elGamal1.encrypt(make_shared<GroupElementPlaintext>(p1));
 	shared_ptr<Plaintext> plaintext = elGamal2.decrypt(cipher.get());
 
-	cout << "generator value is:              " << ((OpenSSLZpSafePrimeElement *)g.get())->getElementValue() << endl;
+	biginteger r = getRandomInRange(0, q-1, gen.get());
+	/*cout << "r: " << r << endl;
+	size_t size = bytesCount(r);
+	cout << "size: " << static_cast<int>(size) << endl;
+	byte* r_bytes = new byte[size];
+	encodeBigInteger(r, r_bytes, size);
+	print_byte_array(r_bytes, static_cast<int>(size), "byte: ");*/
+
+	auto id = dlog->getIdentity();
+	GroupElementPlaintext p_id(id);
+	shared_ptr<AsymmetricCiphertext> c_res = elGamal1.encrypt(make_shared<GroupElementPlaintext>(p_id));
+	biginteger a = 2;
+	biginteger res = 1;
+
+
+	while(r > 0) {
+		if(r & 1) {
+				c_res = elGamal1.multiply(c_res.get(), cipher.get());
+				res = res*a;
+				cout << "res*a = " << res << endl;
+		}
+
+		cipher = elGamal1.multiply(cipher.get(), cipher.get());
+		a = a*a;
+		cout << "a*a = " << a << endl;
+		r >>= 1;
+	}
+
+	cout << "res: " << res << endl;
+
+	/*cout << "generator value is:              " << ((OpenSSLZpSafePrimeElement *)g.get())->getElementValue() << endl;
 	cout << "exponentiate value r is:          " << r << endl;
 	cout << "exponentiation result is:       " << ((OpenSSLZpSafePrimeElement *)g1.get())->getElementValue() << endl;
 	cout << "random element h is:       " << ((OpenSSLZpSafePrimeElement *)h.get())->getElementValue() << endl;
-	cout << "element multplied by expresult: " << ((OpenSSLZpSafePrimeElement *)gMult.get())->getElementValue() << endl;
+	cout << "element multiplied by expresult: " << ((OpenSSLZpSafePrimeElement *)gMult.get())->getElementValue() << endl;
 	cout << "decrypted ciphertext is: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)plaintext.get())->getElement()).get())->getElementValue() << endl;
 	//cout << "encryption and decryption succeedded" << plaintext==(h) << endl;
-  //cout << "plaintext: " << ((OpenSSLZpSafePrimeElement *)pair.first.get())->getElementValue() << endl;
+  //cout << "plaintext: " << ((OpenSSLZpSafePrimeElement *)pair.first.get())->getElementValue() << endl;*/
+
+	//delete[] r_bytes;
+
 	return 0;
 }
