@@ -135,7 +135,7 @@ pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> Server::
 }
 
 /*
-*		Compute [[vec_B]] by multipling [{C}] and [[k]] element-wise
+*		Compute [[vec_B]] by multipling [[C]] and [[k]] element-wise
 */
 vector<shared_ptr<AsymmetricCiphertext>> Server::calc_vec_B_enc(vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc2, shared_ptr<AsymmetricCiphertext> K_enc2) {
 	vector<shared_ptr<AsymmetricCiphertext>> B_enc2;
@@ -152,8 +152,9 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::calc_vec_B_enc(vector<shared_pt
 }
 
 /*
-*		Partial decryption step
+*	Partial decryption step
 * 	[[vec_B]] is partially decrypted to [vec_B]
+*	D1(c1, c2) = (c1^k1, c2)
 */
 vector<shared_ptr<AsymmetricCiphertext>> Server::D1(vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc) {
 	vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc2;
@@ -307,10 +308,10 @@ int Server::main_sh() {
 
 		shared_ptr<Template_enc> T_enc = recv_template(); //receive [[T_u]]
 
-		//shared_ptr<SymmetricCiphertext> aes_k_1 = recv_aes_msg();
+		shared_ptr<SymmetricCiphertext> aes_k_1 = recv_aes_msg();
 		//send_aes_msg(aes_k_1);
 
-		act_p2(5);
+		//act_p2(8, 5);
 
 		io_service.stop();
 		t.join();
@@ -342,9 +343,9 @@ int main(int argc, char* argv[]) {
 		} else if(arg == "mal") {
 			return sv.main_mal();
 		}
+	} else {
+		return sv.usage();
 	}
-
-	return sv.usage();
 
 	return 0;
 }

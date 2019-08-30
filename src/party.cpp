@@ -90,7 +90,6 @@ void Party::send_elgamal_msg(shared_ptr<AsymmetricCiphertext> c_m) {
 */
 void Party::send_aes_msg(shared_ptr<SymmetricCiphertext> c_m) {
 	string c_m_string = c_m->toString();
-  cout << "aes msg: " << c_m_string << endl;
 	channel->writeWithSize(c_m_string);
 }
 
@@ -110,9 +109,7 @@ void Party::send_template(shared_ptr<Template_enc> T_enc) {
   pair<int, int> size = T_enc->size();
 
   for(int i=0; i<size.first; i++) {
-		cout << "i: " << i << endl;
     for(int j=0; j<size.second; j++) {
-			cout << "j: " << j << endl;
       shared_ptr<AsymmetricCiphertext> elem = T_enc->get_elem(i, j);
       send_elgamal_msg(elem);
     }
@@ -174,8 +171,11 @@ shared_ptr<SymmetricCiphertext> Party::recv_aes_msg() {
   shared_ptr<IVCiphertext> c_m;
 
   vector<byte> raw_msg;
+  cout << "before reading into vector" << endl;
 	channel->readWithSizeIntoVector(raw_msg);
-  c_m->initFromByteVector(raw_msg);
+	cout << "before init from byte vector" << endl;
+  c_m->initFromByteVector(raw_msg); 
+  cout << "after init from byte vector" << endl;
 
   return c_m;
 }
@@ -205,13 +205,24 @@ shared_ptr<Template_enc> Party::recv_template() {
       shared_ptr<AsymmetricCiphertext> s_enc = recv_elgamal_msg();
 
       //T_enc.add_elem(s_enc, i);
-			T_enc.set_elem(s_enc, i, j);
+		T_enc.set_elem(s_enc, i, j);
     }
   }
 
   return make_shared<Template_enc>(T_enc);
 }
 
+biginteger Party::random_bit() {
+	return getRandomInRange(0, 1, get_seeded_prg().get());
+}
+
+biginteger Party::random_bitstring(int bits) {
+	return getRandomInRange(0, (biginteger) pow(2, bits), get_seeded_prg().get());
+}
+
+/*
+*	Basic Coin Tossing protocol for party 1
+*/
 int Party::bct_p1() {
   auto dlog2 = make_shared<OpenSSLDlogECF2m>();
 
@@ -219,7 +230,7 @@ int Party::bct_p1() {
 
   shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog2);
 
-  biginteger b = getRandomInRange(0, 1, get_seeded_prg().get());
+  biginteger b = random_bit();
   auto r1_com = make_shared<CmtBigIntegerCommitValue>(make_shared<biginteger>(b));
   //auto r1_com = committer->sampleRandomCommitValue();
   cout << "the committed value is:" << r1_com->toString() << endl;
@@ -248,13 +259,15 @@ int Party::bct_p1() {
   return r;
 }
 
+/*
+*	Basic Coin Tossing protocol for party 2
+*/
 int Party::bct_p2() {
   auto dlog2 = make_shared<OpenSSLDlogECF2m>();
   shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog2);
   shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog2);
 
-  biginteger b = getRandomInRange(0, 1, get_seeded_prg().get());
-  cout << "b: " << b << endl;
+  biginteger b = random_bit();
   auto r2_com = make_shared<CmtBigIntegerCommitValue>(make_shared<biginteger>(b));
   //auto r2_com = committer->sampleRandomCommitValue();
   cout << "the committed value is:" << r2_com->toString() << endl;
@@ -284,21 +297,51 @@ int Party::bct_p2() {
 /*
 *
 */
-void Party::act_p1(int n) {
-  int b[n];
 
-  //Execute the basic coin tossing (coin tossing into the well) n times
-  for(int i=0; i<n; i++) {
-    b[i] = bct_p1();
-  }
+void Party::act_p1(int n, int l) {
+	auto dlog2 = make_shared<OpenSSLDlogECF2m>();
+	shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog2);
+
+	//first sample random number of n bits long, obtaining string r'
+	biginteger r_acc = random_bitstring(n);
+	auto r_acc_comm = make_shared<CmtBigIntegerCommitValue>(make_shared<biginteger>(r_acc));
+
+	cout << "r': " << r_acc << endl;
+
+	//also try to sample random number of n*l bits long, obtaining string s_inv
+
+	//make commitment over first random number with second random number as randomness
+	committer->commit(r_acc_comm, 0);
+
+	//zero knowledge strong proof of knowledge over the commitment with p2
+	//basic coin tossing protocol is executed l times, obtaining string r''
+
+	biginteger r_acc2;
+
+	for (int i = 0; i < l; i++) {
+		int b = bct_p1();
+		cout << "b: " << b << endl;
+		r_acc2 = r_acc2 + ((biginteger) b)* ((biginteger) pow(2, l - i - 1));
+	}
+
+	cout << "r_'': " << r_acc2 << endl;
+
+	//compute r = r' xor r'' 
+
+	biginteger r = r_acc ^ r_acc2;
+
+	cout << "r: " << r << endl;
+	//compute commitment over r ??? and proof zk over commitment
 }
 
-void Party::act_p2(int n) {
-  int b[n];
+void Party::act_p2(int n, int l) {
+	auto dlog2 = make_shared<OpenSSLDlogECF2m>();
+	shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog2);
 
-  //Execute the basic coin tossing (coin tossing into the well) n times
-  for(int i=0; i<n; i++) {
-    b[i] = bct_p2();
-  }
+	auto commitment = receiver->receiveCommitment();
 
+	for (int i = 0; i < l; i++) {
+		int b = bct_p2();
+		cout << "b: " << b << endl;
+	}
 }

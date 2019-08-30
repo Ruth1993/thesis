@@ -13,10 +13,6 @@ class Sensor : public Party {
 public:
 	Sensor(string config_file_path);
 
-	void test_decrypt(shared_ptr<ElGamalOnGroupElementCiphertext> cipher);
-
-	void elgamal_setup();
-
 	pair<int, vector<int>> capture(int u, pair<int, int> template_size);
 
 	pair<int, vector<int>> capture(pair<int, int> template_size);
@@ -34,8 +30,6 @@ public:
 	vector<shared_ptr<GroupElement>> decrypt_vec_B_enc2(vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc);
 
 	shared_ptr<GroupElement> check_key(vector<shared_ptr<GroupElement>> vec_B, shared_ptr<SymmetricCiphertext> aes_K);
-
-	shared_ptr<AsymmetricCiphertext> test_S_enc(biginteger S);
 
 	void test_look_up();
 

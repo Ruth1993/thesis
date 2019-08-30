@@ -126,10 +126,9 @@ tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shar
 	shared_ptr<Template_enc> T_enc = encrypt_template(T);
 
 	//Step 4: pick k \in_R [0, |G|]
-	biginteger p = dlog->getOrder();
-
+	biginteger q = dlog->getOrder();
 	auto gen = get_seeded_prg();
-	biginteger k = getRandomInRange(0, p-1, gen.get()); //generate random k
+	biginteger k = getRandomInRange(0, q-1, gen.get()); //generate random k
 
 	//First encode k to g^k
 	auto g_k = dlog->exponentiate(g.get(), k); //TODO change 2 back to k
@@ -418,15 +417,21 @@ int Sensor::main_sh() {
 		shared_ptr<Template_enc> T_enc = get<1>(enrollment);
 		send_template(T_enc); //send [[T_u]]
 
-		//shared_ptr<SymmetricCiphertext> aes_k_1 = get<2>(enrollment).second;
-		//send_aes_msg(aes_k_1);
-		//shared_ptr<SymmetricCiphertext> aes_k_1_2 = recv_aes_msg();
+
+		shared_ptr<SymmetricCiphertext> aes_k_1 = get<2>(enrollment).second;
+		shared_ptr<Plaintext> test_dec = aes_enc->decrypt((IVCiphertext*) aes_k_1.get());
+		biginteger decryption_int = byte_to_int(((ByteArrayPlaintext *)test_dec.get())->getText());
+
+		cout << "AES_k(1) decrypted: " << decryption_int << endl;
+
+		send_aes_msg(aes_k_1);
+		shared_ptr<SymmetricCiphertext> aes_k_1_2 = recv_aes_msg();
 		//shared_ptr<Plaintext> decryption = aes_enc->decrypt((IVCiphertext*) aes_k_1_2.get());
 		//biginteger decryption_int = byte_to_int(((ByteArrayPlaintext *)decryption.get())->getText());
 
 		//cout << "AES_k(1) decrypted: " << decryption_int << endl;
 
-		act_p1(5);
+		//act_p1(8, 5);
 
 		io_service.stop();
 		t.join();
@@ -460,9 +465,9 @@ int main(int argc, char* argv[]) {
 		} else if(arg == "mal") {
 			return ss.main_mal();
 		}
+	} else {
+		return ss.usage();
 	}
-
-	return ss.usage();
 
 	return 0;
 }

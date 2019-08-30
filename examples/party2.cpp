@@ -4,6 +4,8 @@
 
 #include "../../libscapi/include/interactive_mid_protocols/SigmaProtocol.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolDlog.hpp"
+#include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolPedersenCommittedValue.hpp"
+#include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolPedersenCmtKnowledge.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/ZeroKnowledge.hpp"
 
 #include "../../libscapi/include/mid_layer/OpenSSLSymmetricEnc.hpp"
@@ -50,12 +52,13 @@ int main(int argc, char* argv[]) {
     shared_ptr<CommParty> channel = make_shared<CommPartyTCPSynced>(io_service, p2, p1);
 
     //setup ElGamal communication
-		//First read dlog parameters from file
-		ConfigFile cf("dlog_params.txt");
-		string p = cf.Value("", "p");
-		string g = cf.Value("", "g");
-		string q = cf.Value("", "q");
-    auto dlog = make_shared<OpenSSLDlogZpSafePrime>(q, g, p);
+	//First read dlog parameters from file
+	ConfigFile cf("dlog_params.txt");
+	string p_string = cf.Value("", "p");
+	string g_string = cf.Value("", "g");
+	string q_string = cf.Value("", "q");
+    auto dlog = make_shared<OpenSSLDlogZpSafePrime>(q_string, g_string, p_string);
+	auto g = dlog->getGenerator();
     ElGamalOnGroupElementEnc elgamal(dlog);
     auto pair = elgamal.generateKey();
     elgamal.setKey(pair.first, pair.second);
@@ -64,7 +67,7 @@ int main(int argc, char* argv[]) {
       channel->join(500, 5000);
       cout << "channel established" << endl;
 
-      vector<byte> resMsg;
+      /*vector<byte> resMsg;
       channel->readWithSizeIntoVector(resMsg);
       const byte * uc = &(resMsg[0]);
       string resMsgStr(reinterpret_cast<char const*>(uc), resMsg.size());
@@ -104,18 +107,52 @@ int main(int argc, char* argv[]) {
 				shared_ptr<AsymmetricCiphertextSendableData> elem_sendable = ((ElGamalOnGroupElementCiphertext*) elem.get())->generateSendableData();
 				string elem_sendable_string = elem_sendable->toString();
 				channel->writeWithSize(elem_sendable_string);
-			}
+			}*/
 
 			//Zero-knowledge proof stuff
-			/*ZKFromSigmaVerifier verifier(channel, make_shared<SigmaDlogVerifierComputation>(dlog, 40, get_seeded_prg()), get_seeded_prg());
+			/*auto dlog2 = make_shared<OpenSSLDlogECF2m>();
+			ZKFromSigmaVerifier verifier(channel, make_shared<SigmaDlogVerifierComputation>(dlog, 40, get_seeded_prg()), get_seeded_prg());
 			auto ch = dlog->createRandomElement();
 			auto msgA = make_shared<SigmaGroupElementMsg>(dlog->getIdentity()->generateSendableData());
 			auto msgZ = make_shared<SigmaBIMsg>();
 			shared_ptr<SigmaDlogCommonInput> input = make_shared<SigmaDlogCommonInput>(ch);
 			cout << verifier.verify(input.get(), msgA, msgZ) << endl;*/
 
+			//Fiat Shamir stuff
+			ZKPOKFiatShamirFromSigmaVerifier verifier(channel, make_shared<SigmaDlogVerifierComputation>(dlog, 40));
+
+			shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog);
+			auto com = receiver->receiveCommitment();
+			long id = 0;
+			auto result = receiver->receiveDecommitment(id);
+			if (result == NULL) {
+				cout << "commitment failed" << endl;
+			}
+			else {
+				cout << "the committed value is:" << result->toString() << endl;
+			}
+
+			auto commitmentVal = receiver->getCommitmentPhaseValues(id);
+
+			auto h = static_pointer_cast<GroupElement>(receiver->getPreProcessedValues()[0]);
+			auto commitment = static_pointer_cast<GroupElement>(commitmentVal);
+			SigmaPedersenCmtKnowledgeCommonInput commonInput(h, commitment);
+
+			//auto emptyTrap = make_shared<CmtRTrapdoorCommitPhaseOutput>();
+
+			//biginteger r = 7;
+			//auto co = dlog->exponentiate(g.get(), r);
+			//shared_ptr<SigmaDlogCommonInput> commonInput = make_shared<SigmaDlogCommonInput>(co);
+			vector<byte> cont;
+			auto input = make_shared<ZKPOKFiatShamirCommonInput>(&commonInput, cont);
+			auto msgA = make_shared<SigmaGroupElementMsg>(dlog->getIdentity()->generateSendableData());
+			auto msgZ = make_shared<SigmaBIMsg>();
+			bool output = verifier.verify(input.get(), msgA, msgZ);
+			cout << "proof accepted: " << output << endl;
+
+
 			//Commitment stuff
-      /*auto dlog2 = make_shared<OpenSSLDlogECF2m>();
+      /*
       shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog2);
 			shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog2);
 
@@ -139,11 +176,11 @@ int main(int argc, char* argv[]) {
 			biginteger r1 = *((biginteger *)result->getX().get());
 			biginteger r2 = *((biginteger *)r2_com->getX().get());
 			biginteger r = r1^r2;
-			cout << "r: " << r << endl;
+			cout << "r: " << r << endl;*/
     } catch (const logic_error& e) {
     		// Log error message in the exception object
     		cerr << e.what();
-    }*/
+    }
 
     return 0;
 }

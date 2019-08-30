@@ -72,13 +72,17 @@ public:
 
   shared_ptr<Template_enc> recv_template();
 
+  biginteger random_bit();
+
+  biginteger random_bitstring(int bits);
+
   int bct_p1();
 
   int bct_p2();
 
-  void act_p1(int n);
+  void act_p1(int n, int l);
 
-  void act_p2(int n);
+  void act_p2(int n, int l);
 };
 
 #endif

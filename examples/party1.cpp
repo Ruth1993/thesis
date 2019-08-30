@@ -10,6 +10,7 @@
 #include "../../libscapi/include/interactive_mid_protocols/SigmaProtocol.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolDlog.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/ZeroKnowledge.hpp"
+#include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolPedersenCommittedValue.hpp"
 
 #include <boost/thread/thread.hpp>
 
@@ -72,7 +73,7 @@ int main(int argc, char* argv[]) {
       channel->join(500, 5000);
       cout << "channel established" << endl;
 
-      string longMessage = "Hi, this is a long message to test the writeWithSize approach";
+      /*string longMessage = "Hi, this is a long message to test the writeWithSize approach";
       channel->writeWithSize(longMessage);
 
 
@@ -102,48 +103,76 @@ int main(int argc, char* argv[]) {
 
 				shared_ptr<Plaintext> p_elem = elgamal.decrypt(elem.get());
 				cout << "m: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)p_elem.get())->getElement()).get())->getElementValue() << endl;
-			}
+			}*/
 
 			//Zero-knowledge proof stuff
-			/*ZKFromSigmaProver prover(channel, make_shared<SigmaDlogProverComputation>(dlog, 40, get_seeded_prg()));
+			/*auto dlog2 = make_shared<OpenSSLDlogECF2m>("K-233");
+			ZKFromSigmaProver prover(channel, make_shared<SigmaDlogProverComputation>(dlog, 40));
 			biginteger q = dlog->getOrder();
 			biginteger r = getRandomInRange(0, q-1, get_seeded_prg().get());
 			auto co = dlog->exponentiate(g.get(), r);
 			shared_ptr<SigmaDlogProverInput> input = make_shared<SigmaDlogProverInput>(co, r);
 			prover.prove(input);*/
 
-			//Basic Coin Tossing protocol
-      /*auto dlog2 = make_shared<OpenSSLDlogECF2m>();
-      shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog2);
-			shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog2);
+			//Fiat Shamir stuff
+			ZKPOKFiatShamirFromSigmaProver prover(channel, make_shared<SigmaDlogProverComputation>(dlog, 40));
 
-			biginteger b = getRandomInRange(0, 1, get_seeded_prg().get());
-			auto r1_com = make_shared<CmtBigIntegerCommitValue>(make_shared<biginteger>(b));
-			//auto r1_com = committer->sampleRandomCommitValue();
-      cout << "the committed value is:" << r1_com->toString() << endl;
+			shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog);
+			shared_ptr<CmtCommitValue> com = committer->sampleRandomCommitValue();
+			cout << "the committed value is:" << com->toString() << endl;
+			long id = 0;
+			committer->commit(com, id);
+			committer->decommit(id);
 
-			auto commitment = receiver->receiveCommitment();
+			auto val = committer->getCommitmentPhaseValues(id);
 
-      committer->commit(r1_com, 0);
+			auto h = static_pointer_cast<GroupElement>(committer->getPreProcessValues()[0]);
+			auto commitment = static_pointer_cast<GroupElement>(val->getComputedCommitment());
+			biginteger x = *static_pointer_cast<biginteger>(val->getX()->getX());
+			biginteger r = static_pointer_cast<BigIntegerRandomValue>(val->getR())->getR();
+			shared_ptr<SigmaPedersenCommittedValueProverInput> proverInput = make_shared<SigmaPedersenCommittedValueProverInput>(h, commitment, x, r);
 
-			auto result = receiver->receiveDecommitment(1);
-
-      committer->decommit(0);
-
-			if (result == NULL) {
-				cout << "commitment failed" << endl;
-			} else {
-				cout << "the committed value is:" << result->toString() << endl;
-			}
-
-			biginteger r2 = *((biginteger *)result->getX().get());
-			biginteger r1 = *((biginteger *)r1_com->getX().get());
-			biginteger r = r1^r2;
-			cout << "r: " << r << endl;
+			biginteger q = dlog->getOrder();
+			//biginteger k = 7;
+			//auto r = dlog->exponentiate(g.get(), k);
+			//shared_ptr<SigmaDlogProverInput> proverInput = make_shared<SigmaDlogProverInput>(r, k);
+			//SigmaPedersenCmtKnowledgeProverInput proverInput(const shared_ptr<GroupElement> & h, const shared_ptr<GroupElement> & commitment, const biginteger & x, const biginteger & r)
+			//shared_ptr<SigmaPedersenCommittedValueProverInput> proverInput = make_shared<SigmaPedersenCommittedValueProverInput>(const shared_ptr<GroupElement> & h, const shared_ptr<GroupElement> & commitment, const biginteger & x, const biginteger & r);
+			vector<byte> cont;
+			auto input = make_shared<ZKPOKFiatShamirProverInput>(proverInput, cont);
+			prover.prove(input);
     } catch (const logic_error& e) {
     		// Log error message in the exception object
     		cerr << e.what();
-    }*/
+    }
+
+	//Basic Coin Tossing protocol
+/*auto dlog2 = make_shared<OpenSSLDlogECF2m>();
+shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog2);
+shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog2);
+
+biginteger b = getRandomInRange(0, 1, get_seeded_prg().get());
+auto r1_com = make_shared<CmtBigIntegerCommitValue>(make_shared<biginteger>(b));
+//auto r1_com = committer->sampleRandomCommitValue();
+cout << "the committed value is:" << r1_com->toString() << endl;
+auto commitment = receiver->receiveCommitment();
+
+committer->commit(r1_com, 0);
+
+auto result = receiver->receiveDecommitment(1);
+
+committer->decommit(0);
+
+if (result == NULL) {
+	cout << "commitment failed" << endl;
+} else {
+	cout << "the committed value is:" << result->toString() << endl;
+}
+
+biginteger r2 = *((biginteger *)result->getX().get());
+biginteger r1 = *((biginteger *)r1_com->getX().get());
+biginteger r = r1^r2;
+cout << "r: " << r << endl;*/
 
     return 0;
 }

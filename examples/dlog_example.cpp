@@ -59,7 +59,7 @@ int main(int argc, char* argv[]){
 	biginteger res = 1;
 
 
-	while(r > 0) {
+	/*while(r > 0) {
 		if(r & 1) {
 				c_res = elGamal1.multiply(c_res.get(), cipher.get());
 				res = res*a;
@@ -72,7 +72,10 @@ int main(int argc, char* argv[]){
 		r >>= 1;
 	}
 
-	cout << "res: " << res << endl;
+	cout << "res: " << res << endl;*/
+
+	biginteger r_acc = getRandomInRange(0, (biginteger)pow(2, 5), gen.get());
+	cout << "r': " << r_acc << endl;
 
 	/*cout << "generator value is:              " << ((OpenSSLZpSafePrimeElement *)g.get())->getElementValue() << endl;
 	cout << "exponentiate value r is:          " << r << endl;
