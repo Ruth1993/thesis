@@ -424,14 +424,17 @@ int Sensor::main_sh() {
 
 		cout << "AES_k(1) decrypted: " << decryption_int << endl;
 
-		send_aes_msg(aes_k_1);
-		shared_ptr<SymmetricCiphertext> aes_k_1_2 = recv_aes_msg();
+		//send_aes_msg(aes_k_1);
+		//shared_ptr<SymmetricCiphertext> aes_k_1_2 = recv_aes_msg();
 		//shared_ptr<Plaintext> decryption = aes_enc->decrypt((IVCiphertext*) aes_k_1_2.get());
 		//biginteger decryption_int = byte_to_int(((ByteArrayPlaintext *)decryption.get())->getText());
 
 		//cout << "AES_k(1) decrypted: " << decryption_int << endl;
 
-		//act_p1(8, 5);
+		pair<biginteger, biginteger> r_randomness = act_p1(3, 5);
+		biginteger x = 3;
+		biginteger r = ic_p1(x);
+		cout << "r: " << r << endl;
 
 		io_service.stop();
 		t.join();

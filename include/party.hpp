@@ -80,9 +80,13 @@ public:
 
   int bct_p2();
 
-  void act_p1(int n, int l);
+  pair<biginteger, biginteger> act_p1(int n, int l);
 
-  void act_p2(int n, int l);
+  shared_ptr<CmtRCommitPhaseOutput> act_p2(int n, int l);
+
+  biginteger ic_p1(biginteger x);
+
+  shared_ptr<CmtRCommitPhaseOutput> ic_p2();
 };
 
 #endif

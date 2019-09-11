@@ -11,6 +11,7 @@
 #include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolDlog.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/ZeroKnowledge.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolPedersenCommittedValue.hpp"
+#include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolPedersenCmtKnowledge.hpp"
 
 #include <boost/thread/thread.hpp>
 
@@ -115,7 +116,8 @@ int main(int argc, char* argv[]) {
 			prover.prove(input);*/
 
 			//Fiat Shamir stuff
-			ZKPOKFiatShamirFromSigmaProver prover(channel, make_shared<SigmaDlogProverComputation>(dlog, 40));
+			/*shared_ptr<SigmaPedersenCmtKnowledgeProverComputation> proverComputation = make_shared<SigmaPedersenCmtKnowledgeProverComputation>(dlog, 40, get_seeded_prg());
+			ZKPOKFiatShamirFromSigmaProver prover(channel, proverComputation);
 
 			shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog);
 			shared_ptr<CmtCommitValue> com = committer->sampleRandomCommitValue();
@@ -124,23 +126,57 @@ int main(int argc, char* argv[]) {
 			committer->commit(com, id);
 			committer->decommit(id);
 
+			cout << "before val" << endl;
 			auto val = committer->getCommitmentPhaseValues(id);
 
-			auto h = static_pointer_cast<GroupElement>(committer->getPreProcessValues()[0]);
-			auto commitment = static_pointer_cast<GroupElement>(val->getComputedCommitment());
-			biginteger x = *static_pointer_cast<biginteger>(val->getX()->getX());
-			biginteger r = static_pointer_cast<BigIntegerRandomValue>(val->getR())->getR();
-			shared_ptr<SigmaPedersenCommittedValueProverInput> proverInput = make_shared<SigmaPedersenCommittedValueProverInput>(h, commitment, x, r);
+			cout << "before h" << endl;
 
-			biginteger q = dlog->getOrder();
+			auto h = static_pointer_cast<GroupElement>(committer->getPreProcessValues()[0]);
+			cout << "h: " << ((OpenSSLZpSafePrimeElement*)h.get())->getElementValue() << endl;
+
+			cout << "before commitment" << endl;
+			auto commitment = static_pointer_cast<GroupElement>(val->getComputedCommitment());
+
+			cout << "before x" << endl;
+			biginteger x = *static_pointer_cast<biginteger>(val->getX()->getX());
+
+			cout << "x: " << x << endl;
+
+			cout << "before r" << endl;
+			biginteger r = static_pointer_cast<BigIntegerRandomValue>(val->getR())->getR();
+
+			cout << "r: " << r << endl;
+
+			cout << "before Pedersen prover input" << endl;
+			shared_ptr<SigmaPedersenCmtKnowledgeProverInput> proverInput = make_shared<SigmaPedersenCmtKnowledgeProverInput>(h, commitment, x, r);
+
+			//biginteger q = dlog->getOrder();
 			//biginteger k = 7;
 			//auto r = dlog->exponentiate(g.get(), k);
 			//shared_ptr<SigmaDlogProverInput> proverInput = make_shared<SigmaDlogProverInput>(r, k);
-			//SigmaPedersenCmtKnowledgeProverInput proverInput(const shared_ptr<GroupElement> & h, const shared_ptr<GroupElement> & commitment, const biginteger & x, const biginteger & r)
-			//shared_ptr<SigmaPedersenCommittedValueProverInput> proverInput = make_shared<SigmaPedersenCommittedValueProverInput>(const shared_ptr<GroupElement> & h, const shared_ptr<GroupElement> & commitment, const biginteger & x, const biginteger & r);
+
 			vector<byte> cont;
+
+			cout << "before FiatShamir prover input" << endl;
 			auto input = make_shared<ZKPOKFiatShamirProverInput>(proverInput, cont);
-			prover.prove(input);
+
+			cout << "before actual proof" << endl;
+			prover.prove(input);*/
+
+			//Pedersen commitment with proof
+		  CmtPedersenWithProofsCommitter committer(channel, 40, dlog);
+		  shared_ptr<CmtCommitValue> com = committer.sampleRandomCommitValue();
+		  cout << "the committed value is:" << com->toString() << endl;
+		  long id = 0;
+		  committer.commit(com, id);
+		  committer.decommit(id);
+
+		  committer.proveKnowledge(id);
+
+		  biginteger a = 13;
+		  biginteger b = 34;
+		  biginteger c = a ^ b;
+		  cout << "a xor b: " << c << endl;
     } catch (const logic_error& e) {
     		// Log error message in the exception object
     		cerr << e.what();

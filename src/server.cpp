@@ -308,16 +308,17 @@ int Server::main_sh() {
 
 		shared_ptr<Template_enc> T_enc = recv_template(); //receive [[T_u]]
 
-		shared_ptr<SymmetricCiphertext> aes_k_1 = recv_aes_msg();
+		//shared_ptr<SymmetricCiphertext> aes_k_1 = recv_aes_msg();
 		//send_aes_msg(aes_k_1);
 
-		//act_p2(8, 5);
+		auto com_r = act_p2(3, 5);
+		auto com_x = ic_p2();
 
 		io_service.stop();
 		t.join();
 	} catch (const logic_error& e) {
-			// Log error message in the exception object
-			cerr << e.what();
+		// Log error message in the exception object
+		cerr << e.what();
 	}
 
 

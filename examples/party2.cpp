@@ -2,11 +2,11 @@
 #include "../../libscapi/include/interactive_mid_protocols/CommitmentScheme.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/CommitmentSchemePedersen.hpp"
 
+#include "../../libscapi/include/interactive_mid_protocols/ZeroKnowledge.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/SigmaProtocol.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolDlog.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolPedersenCommittedValue.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolPedersenCmtKnowledge.hpp"
-#include "../../libscapi/include/interactive_mid_protocols/ZeroKnowledge.hpp"
 
 #include "../../libscapi/include/mid_layer/OpenSSLSymmetricEnc.hpp"
 #include "../../libscapi/include/primitives/DlogOpenSSL.hpp"
@@ -119,9 +119,7 @@ int main(int argc, char* argv[]) {
 			cout << verifier.verify(input.get(), msgA, msgZ) << endl;*/
 
 			//Fiat Shamir stuff
-			ZKPOKFiatShamirFromSigmaVerifier verifier(channel, make_shared<SigmaDlogVerifierComputation>(dlog, 40));
-
-			shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog);
+			/*shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog);
 			auto com = receiver->receiveCommitment();
 			long id = 0;
 			auto result = receiver->receiveDecommitment(id);
@@ -132,25 +130,57 @@ int main(int argc, char* argv[]) {
 				cout << "the committed value is:" << result->toString() << endl;
 			}
 
+			shared_ptr<SigmaPedersenCmtKnowledgeVerifierComputation> verifierComputation = make_shared<SigmaPedersenCmtKnowledgeVerifierComputation>(dlog, 40, get_seeded_prg());
+			ZKPOKFiatShamirFromSigmaVerifier verifier(channel, verifierComputation);
+
+			cout << "before commitmentVal" << endl;
+
 			auto commitmentVal = receiver->getCommitmentPhaseValues(id);
 
+			cout << "commitmentVal: " << ((OpenSSLZpSafePrimeElement*)commitmentVal.get())->getElementValue() << endl;
+
+			cout << "after commitmentVal" << endl;
+
 			auto h = static_pointer_cast<GroupElement>(receiver->getPreProcessedValues()[0]);
+
+			cout << "h: " << ((OpenSSLZpSafePrimeElement*)h.get())->getElementValue() << endl;
+
+			cout << "after creation of h" << endl;
 			auto commitment = static_pointer_cast<GroupElement>(commitmentVal);
+
+			cout << "commitment: " << ((OpenSSLZpSafePrimeElement*)commitment.get())->getElementValue() << endl;
+
+			cout << "after creation of commitment" << endl;
 			SigmaPedersenCmtKnowledgeCommonInput commonInput(h, commitment);
 
-			//auto emptyTrap = make_shared<CmtRTrapdoorCommitPhaseOutput>();
+			cout << "after creation of Pedersen common input" << endl;
 
 			//biginteger r = 7;
 			//auto co = dlog->exponentiate(g.get(), r);
 			//shared_ptr<SigmaDlogCommonInput> commonInput = make_shared<SigmaDlogCommonInput>(co);
 			vector<byte> cont;
+			cout << "before Fiat Shamir input" << endl;
 			auto input = make_shared<ZKPOKFiatShamirCommonInput>(&commonInput, cont);
 			auto msgA = make_shared<SigmaGroupElementMsg>(dlog->getIdentity()->generateSendableData());
 			auto msgZ = make_shared<SigmaBIMsg>();
+
+			cout << "before output" << endl;
 			bool output = verifier.verify(input.get(), msgA, msgZ);
-			cout << "proof accepted: " << output << endl;
+			cout << "proof accepted: " << output << endl;*/
 
+			//Pedersen commitment with proof
+			CmtPedersenWithProofsReceiver receiver(channel, 40, dlog);
+			auto com = receiver.receiveCommitment();
+			long id = 0;
+			auto result = receiver.receiveDecommitment(id);
+			if (result == NULL) {
+				cout << "commitment failed" << endl;
+			}
+			else {
+				cout << "the committed value is:" << result->toString() << endl;
+			}
 
+			cout << "proof accepted: " << receiver.verifyKnowledge(id) << endl;
 			//Commitment stuff
       /*
       shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog2);

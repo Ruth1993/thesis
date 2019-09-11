@@ -224,16 +224,14 @@ biginteger Party::random_bitstring(int bits) {
 *	Basic Coin Tossing protocol for party 1
 */
 int Party::bct_p1() {
-  auto dlog2 = make_shared<OpenSSLDlogECF2m>();
+  shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog);
 
-  shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog2);
-
-  shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog2);
+  shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog);
 
   biginteger b = random_bit();
   auto r1_com = make_shared<CmtBigIntegerCommitValue>(make_shared<biginteger>(b));
   //auto r1_com = committer->sampleRandomCommitValue();
-  cout << "the committed value is:" << r1_com->toString() << endl;
+  //cout << "the committed value is:" << r1_com->toString() << endl;
 
   auto commitment = receiver->receiveCommitment();
 
@@ -244,9 +242,9 @@ int Party::bct_p1() {
   committer->decommit(0);
 
   if (result == NULL) {
-    cout << "commitment failed" << endl;
+    cout << "commitment in basic coin tossing protocol failed" << endl;
   } else {
-    cout << "the committed value is:" << result->toString() << endl;
+    //cout << "the committed value is:" << result->toString() << endl;
   }
 
   //biginteger r2 = *((biginteger *)result->getX().get());
@@ -254,7 +252,7 @@ int Party::bct_p1() {
   int r2 = stoi(result->toString());
   int r1 = stoi(r1_com->toString());
   int r = (r1^r2);
-  cout << "r: " << r << endl;
+  //cout << "r: " << r << endl;
 
   return r;
 }
@@ -263,14 +261,13 @@ int Party::bct_p1() {
 *	Basic Coin Tossing protocol for party 2
 */
 int Party::bct_p2() {
-  auto dlog2 = make_shared<OpenSSLDlogECF2m>();
-  shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog2);
-  shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog2);
+  shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog);
+  shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog);
 
   biginteger b = random_bit();
   auto r2_com = make_shared<CmtBigIntegerCommitValue>(make_shared<biginteger>(b));
   //auto r2_com = committer->sampleRandomCommitValue();
-  cout << "the committed value is:" << r2_com->toString() << endl;
+  //cout << "the committed value is:" << r2_com->toString() << endl;
   committer->commit(r2_com, 1);
 
   auto commitment = receiver->receiveCommitment();
@@ -279,9 +276,9 @@ int Party::bct_p2() {
 
   auto result = receiver->receiveDecommitment(0);
   if (result == NULL) {
-    cout << "commitment failed" << endl;
+    cout << "commitment in basic coin tossing protocol failed" << endl;
   } else {
-    cout << "the committed value is:" << result->toString() << endl;
+    //cout << "the committed value is:" << result->toString() << endl;
   }
 
   //biginteger r1 = *((biginteger *)result->getX().get());
@@ -289,59 +286,202 @@ int Party::bct_p2() {
   //biginteger r2 = *((biginteger *)r2_com->getX().get());
   int r2 = stoi(r2_com->toString());
   int r = (r1^r2);
-  cout << "r: " << r << endl;
+  //cout << "r: " << r << endl;
 
   return r;
 }
 
 /*
-*
+*	Augmented Coin Tossing for party 1
 */
+pair<biginteger, biginteger> Party::act_p1(int n, int l) {
+	cout << "------------AUGMENTED COIN TOSSING FOR P1-----------" << endl;
 
-void Party::act_p1(int n, int l) {
-	auto dlog2 = make_shared<OpenSSLDlogECF2m>();
-	shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog2);
+	CmtPedersenWithProofsCommitter committer(channel, 40, dlog);
 
-	//first sample random number of n bits long, obtaining string r'
-	biginteger r_acc = random_bitstring(n);
-	auto r_acc_comm = make_shared<CmtBigIntegerCommitValue>(make_shared<biginteger>(r_acc));
-
+	//select r' = \sigma_1,...,\sigma_l \in (0,1) and s=s_1,...,s_l \in (0,1)^n
+	biginteger r_acc = random_bitstring(l);
 	cout << "r': " << r_acc << endl;
+	biginteger s = random_bitstring(n * l);
+	cout << "s: " << s << endl;
 
-	//also try to sample random number of n*l bits long, obtaining string s_inv
+	//compute commitment over r' using randomness s and perform ZKPOK to prove knowledge of r'
+	shared_ptr<CmtCommitValue> com_r_acc = make_shared<CmtBigIntegerCommitValue>(make_shared<biginteger>(r_acc));
+	long id_r_acc = 0;
+	cout << "committing on r' using randomness s..." << endl;
+	committer.commit(com_r_acc, s, id_r_acc);
+	committer.decommit(id_r_acc);
 
-	//make commitment over first random number with second random number as randomness
-	committer->commit(r_acc_comm, 0);
+	cout << "proving knowledge on com(r',s)..." << endl;
+	committer.proveKnowledge(id_r_acc);
 
-	//zero knowledge strong proof of knowledge over the commitment with p2
-	//basic coin tossing protocol is executed l times, obtaining string r''
-
+	//p1 and p2 engage in BCT protocol l times to generate r_acc2
 	biginteger r_acc2;
 
 	for (int i = 0; i < l; i++) {
 		int b = bct_p1();
-		cout << "b: " << b << endl;
-		r_acc2 = r_acc2 + ((biginteger) b)* ((biginteger) pow(2, l - i - 1));
+		r_acc2 = r_acc2 + ((biginteger)b) * ((biginteger)pow(2, l - i - 1));
 	}
 
-	cout << "r_'': " << r_acc2 << endl;
+	cout << "obtained r'' through BCT: " << r_acc2 << endl;
 
-	//compute r = r' xor r'' 
-
+	//generate r = r' xor r''
 	biginteger r = r_acc ^ r_acc2;
 
-	cout << "r: " << r << endl;
-	//compute commitment over r ??? and proof zk over commitment
+	cout << "compute r = r' xor r'': " << r << endl;
+
+	//compute commitment over r and perform ZKPOK to prove knowledge of r
+	shared_ptr<CmtCommitValue> com_r = make_shared<CmtBigIntegerCommitValue>(make_shared<biginteger>(r));
+	long id_r = 1;
+	cout << "committing on r..." << endl;
+	committer.commit(com_r, id_r);
+	committer.decommit(id_r);
+
+	cout << "proving knowledge on com(r)..." << endl;
+	committer.proveKnowledge(id_r);
+
+	cout << "----------------------------------------------------" << endl;
+
+	biginteger randomness = static_pointer_cast<BigIntegerRandomValue>(committer.getCommitmentPhaseValues(id_r)->getR())->getR();
+
+	return make_pair(r, randomness);
 }
 
-void Party::act_p2(int n, int l) {
-	auto dlog2 = make_shared<OpenSSLDlogECF2m>();
-	shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog2);
+/*
+*	Augmented Coin Tossing for party 2
+*/
+shared_ptr<CmtRCommitPhaseOutput> Party::act_p2(int n, int l) {
+	cout << "------------AUGMENTED COIN TOSSING FOR P2-----------" << endl;
 
-	auto commitment = receiver->receiveCommitment();
+	CmtPedersenWithProofsReceiver receiver(channel, 40, dlog);
+
+	//receive commitment over r' from p1
+	auto com_r_acc = receiver.receiveCommitment();
+	long id_r_acc = 0;
+	auto result_r_acc = receiver.receiveDecommitment(id_r_acc);
+	if (result_r_acc == NULL) {
+		cout << "commitment of r' using randomness s failed" << endl;
+	}
+	else {
+		cout << "succesfully obtained commitment over r' using randomness s" << endl;
+		cout << "r': " << result_r_acc->toString() << endl;
+	}
+
+	//verify zkpof-proof over commitment of r
+	cout << "ZKPOF-proof on com(r',s) accepted: " << receiver.verifyKnowledge(id_r_acc) << endl;
+
+	//p1 and p2 engage in BCT protocol l times to generate r_acc2
+	biginteger r_acc2;
 
 	for (int i = 0; i < l; i++) {
 		int b = bct_p2();
-		cout << "b: " << b << endl;
+		r_acc2 = r_acc2 + ((biginteger)b) * ((biginteger)pow(2, l - i - 1));
 	}
+
+	cout << "obtained r'' through BCT: " << r_acc2 << endl;
+
+	//receive commitment over r from p1
+	auto com_r = receiver.receiveCommitment();
+	long id_r = 1;
+	auto result_r = receiver.receiveDecommitment(id_r);
+	if (result_r == NULL) {
+		cout << "commitment failed" << endl;
+	}
+	else {
+		cout << "succesfully obtained commitment over r" << endl;
+		cout << "r: " << result_r->toString() << endl;
+	}
+
+	cout << "ZKPOF-proof on com(r) accepted: " << receiver.verifyKnowledge(id_r) << endl;
+
+	cout << "----------------------------------------------------" << endl;
+
+	return com_r;
+}
+
+/*
+*	Input Commitment protocol for party 1
+*/
+biginteger Party::ic_p1(biginteger x) {
+	cout << "------------INPUT COMMITMENT FOR P1-----------------" << endl;
+
+	cout << "entering protocol with input x: " << x << endl;
+
+	CmtPedersenWithProofsCommitter committer(channel, 40, dlog);
+
+	//compute commitment over x and perform ZKPOF on com(x,r')
+	shared_ptr<CmtCommitValue> com_x = make_shared<CmtBigIntegerCommitValue>(make_shared<biginteger>(x));
+	cout << "number of bits:" << NumberOfBits(x) << endl;
+	int n = NumberOfBits(x);
+	biginteger r_acc = random_bitstring(pow(2, n));
+	long id_x_r_acc = 0;
+	cout << "committing on x using randomness r'..." << endl;
+	committer.commit(com_x, r_acc, id_x_r_acc);
+	committer.decommit(id_x_r_acc);
+
+	cout << "proving knowledge on com(x,r')..." << endl;
+	committer.proveKnowledge(id_x_r_acc);
+
+	//perform augmented coin tossing protocol to obtain output (r, r'')
+	pair<biginteger, biginteger> r_r_acc2 = act_p1(pow(2,n), n);
+	biginteger r = r_r_acc2.first;
+	biginteger r_acc2 = r_r_acc2.second;
+
+	//compute com(x,r) and perform ZKPOF on com(x,r)
+	cout << "committing on x using randomness r..." << endl;
+	long id_x_r = 1;
+	committer.commit(com_x, r, id_x_r);
+	committer.decommit(id_x_r);
+
+	cout << "proving knowledge on com(x,r)..." << endl;
+	committer.proveKnowledge(id_x_r);
+
+	cout << "----------------------------------------------------" << endl;
+
+	return r;
+}
+
+/*
+*	Input Commitment protocol for party 2
+*/
+shared_ptr<CmtRCommitPhaseOutput> Party::ic_p2() {
+	cout << "------------INPUT COMMITMENT FOR P2-----------------" << endl;
+
+	CmtPedersenWithProofsReceiver receiver(channel, 40, dlog);
+
+	//receive commitment over x from p1
+	auto com_x_r_acc = receiver.receiveCommitment();
+	long id_x_r_acc = 0;
+	auto result_x_r_acc = receiver.receiveDecommitment(id_x_r_acc);
+	if (result_x_r_acc == NULL) {
+		cout << "commitment of x using randomness r' failed" << endl;
+	}
+	else {
+		cout << "succesfully obtained commitment over x using randomness r'" << endl;
+		cout << "x: " << result_x_r_acc->toString() << endl;
+	}
+
+	//verify ZKPOF over com(x,r')
+	cout << "ZKPOF on com(x,r') accepted: " << receiver.verifyKnowledge(id_x_r_acc) << endl;
+
+	//perform augmented coin tossing protocol to obtain output c'' = com(r, r'')
+	int n = NumberOfBits(*((biginteger*) result_x_r_acc->getX().get()));
+	auto com_r_r_acc = act_p2(pow(2, n), n);
+
+	//receive commitment over x using randomness r
+	auto com_x_r = receiver.receiveCommitment();
+	long id_x_r = 1;
+	auto result_x_r = receiver.receiveDecommitment(id_x_r);
+	if (result_x_r == NULL) {
+		cout << "commitment of x using randomness r failed" << endl;
+	}
+	else {
+		cout << "succesfully obtained commitment over x using randomness r" << endl;
+		cout << "x: " << result_x_r->toString() << endl;
+	}
+
+	//verify ZKPOF over com(x,r)
+	cout << "ZKPOF on com(x,r) accepted: " << receiver.verifyKnowledge(id_x_r) << endl;
+
+	cout << "----------------------------------------------------" << endl;
 }
