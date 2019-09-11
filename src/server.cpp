@@ -311,9 +311,6 @@ int Server::main_sh() {
 		//shared_ptr<SymmetricCiphertext> aes_k_1 = recv_aes_msg();
 		//send_aes_msg(aes_k_1);
 
-		auto com_r = act_p2(3, 5);
-		auto com_x = ic_p2();
-
 		io_service.stop();
 		t.join();
 	} catch (const logic_error& e) {
@@ -326,7 +323,9 @@ int Server::main_sh() {
 }
 
 int Server::main_mal() {
-	cout << "not yet implemented" << endl;
+	auto com_r = act_p2(3, 5);
+	auto com_x = ic_p2();
+
 	return 0;
 }
 

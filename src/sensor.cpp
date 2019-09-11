@@ -431,11 +431,6 @@ int Sensor::main_sh() {
 
 		//cout << "AES_k(1) decrypted: " << decryption_int << endl;
 
-		pair<biginteger, biginteger> r_randomness = act_p1(3, 5);
-		biginteger x = 3;
-		biginteger r = ic_p1(x);
-		cout << "r: " << r << endl;
-
 		io_service.stop();
 		t.join();
 	} catch (const logic_error& e) {
@@ -449,7 +444,11 @@ int Sensor::main_sh() {
 *		Main function for malicious protocol
 */
 int Sensor::main_mal() {
-	cout << "not yet implemented" << endl;
+	pair<biginteger, biginteger> r_randomness = act_p1(3, 5);
+	biginteger x = getRandomInRange(0, dlog->getOrder() - 1, get_seeded_prg().get());
+	biginteger r = ic_p1(x);
+	cout << "r: " << r << endl;
+
 	return 0;
 }
 
