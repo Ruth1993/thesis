@@ -20,8 +20,12 @@ Compile:
 - make
 
 Run:
-- ./server 
-- ./sensor
+- Semi-honest protocol:
+	- ./server or ./server sh
+	- ./sensor or ./sensor sh
+- Malicious protocol:
+	- ./server mal
+	- ./sensor mal
 
 Interpretation of the output:
 - First of all, please note that the code is work in progress, so it will probably give you weird output.
