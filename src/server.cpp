@@ -32,8 +32,8 @@ Server::Server(string config_file_path) {
 /*
 *		Store enrollment of sensor in table
 */
-void Server::store_table(tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enrollment) {
-	table.add_entry(get<0>(enrollment), get<1>(enrollment), get<2>(enrollment).first, get<2>(enrollment).second);
+void Server::store_table(int u, shared_ptr<Template_enc> T_enc, shared_ptr<AsymmetricCiphertext> c_k, shared_ptr<SymmetricCiphertext> aes_k_1) {
+	table.add_entry(u, T_enc, c_k, aes_k_1);
 }
 
 
@@ -286,7 +286,7 @@ int Server::main_sh() {
 
 		channel = make_shared<CommPartyTCPSynced>(io_service, server, sensor);
 
-		boost::thread t(boost::bind(&boost::asio::io_service::run, &io_service));
+		boost::thread th(boost::bind(&boost::asio::io_service::run, &io_service));
 
 		//Join channel
 		channel->join(500, 5000);
@@ -302,17 +302,49 @@ int Server::main_sh() {
 		key_setup(pk_ss);
 
 		//Receive enrollment parameters from sensor
-		string u = recv_msg(); //receive u
-		cout << "u: " << u << endl;
-		shared_ptr<AsymmetricCiphertext> test = recv_elgamal_msg();
+		int u_enroll = stoi(recv_msg()); //receive u
+		cout << "received enrollment from user u: " << u_enroll << endl;
+		shared_ptr<Template_enc> T_enc_enroll = recv_template(); //receive [[T_u]]
+		shared_ptr<AsymmetricCiphertext> k_enc_enroll = recv_msg_enc(); //receive [[k]]
+		shared_ptr<SymmetricCiphertext> aes_k_1_enroll = recv_aes_msg(); //receive AES_k(1)
 
-		shared_ptr<Template_enc> T_enc = recv_template(); //receive [[T_u]]
+		//Store enrollment in table
+		store_table(u_enroll, T_enc_enroll, k_enc_enroll, aes_k_1_enroll);
 
-		//shared_ptr<SymmetricCiphertext> aes_k_1 = recv_aes_msg();
-		//send_aes_msg(aes_k_1);
+		//Receive identity claim u from sensor
+		int u = stoi(recv_msg());
+		cout << "received identity claim u: " << u << endl;
+
+		//Fetch T_u from table
+		shared_ptr<Template_enc> T_enc = fetch_template(u);
+
+		//Send T_u to sensor
+		send_template(T_enc);
+
+		//Receive [[S]] from sensor
+		shared_ptr<AsymmetricCiphertext> S_enc = recv_msg_enc();
+
+		//Compare [[S]] with t
+		vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc = compare(S_enc, t, max_S);
+
+		//Permute [[vec_C]]
+		vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc_prime = permute(vec_C_enc);
+
+		//Fetch key pair ([[k]], AES_k(1)) from table
+		pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> key_pair = fetch_key_pair(u);
+
+		//Multiply elements in [[vec_C]] with [[k]]
+		vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc = calc_vec_B_enc(vec_C_enc_prime, key_pair.first);
+
+		//Perform partial decryption function D1
+		vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc2 = D1(vec_B_enc);
+
+		//Send pair ([vec_B], AES_k(1)) to sensor
+		send_vec_enc(vec_B_enc2);
+		send_aes_msg(key_pair.second);
 
 		io_service.stop();
-		t.join();
+		th.join();
 	} catch (const logic_error& e) {
 		// Log error message in the exception object
 		cerr << e.what();
@@ -323,8 +355,30 @@ int Server::main_sh() {
 }
 
 int Server::main_mal() {
-	auto com_r = act_p2(3, 5);
-	auto com_x = ic_p2();
+	try {
+		//First set up channel
+		boost::asio::io_service io_service;
+
+		SocketPartyData server = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8000);
+		SocketPartyData sensor = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8001);
+
+		channel = make_shared<CommPartyTCPSynced>(io_service, server, sensor);
+
+		boost::thread th(boost::bind(&boost::asio::io_service::run, &io_service));
+
+		//Join channel
+		channel->join(500, 5000);
+		cout << "channel established" << endl;
+
+		auto com_r = act_p2(3, 5);
+		auto com_x = ic_p2();
+
+		io_service.stop();
+		th.join();
+	}
+	catch (const logic_error& e) {
+		cerr << e.what();
+	}
 
 	return 0;
 }

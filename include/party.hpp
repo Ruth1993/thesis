@@ -54,7 +54,7 @@ public:
 
   void send_pk();
 
-  void send_elgamal_msg(shared_ptr<AsymmetricCiphertext> c_m);
+  void send_msg_enc(shared_ptr<AsymmetricCiphertext> c_m);
 
   void send_aes_msg(shared_ptr<SymmetricCiphertext> c_m);
 
@@ -64,11 +64,11 @@ public:
 
   string recv_msg();
 
-  shared_ptr<AsymmetricCiphertext> recv_elgamal_msg();
+  shared_ptr<AsymmetricCiphertext> recv_msg_enc();
 
   shared_ptr<SymmetricCiphertext> recv_aes_msg();
 
-  vector<shared_ptr<AsymmetricCiphertext>> recv_vec_enc(int size);
+  vector<shared_ptr<AsymmetricCiphertext>> recv_vec_enc();
 
   shared_ptr<Template_enc> recv_template();
 
@@ -79,6 +79,14 @@ public:
   int bct_p1();
 
   int bct_p2();
+
+  void ac_p1(shared_ptr<CmtWithProofsCommitter> committer, biginteger x, biginteger r, long id_x_r, string x_name, string r_name);
+
+  void ac_p1(shared_ptr<CmtWithProofsCommitter> committer, biginteger x, long id_x_r, string x_name);
+
+  pair<shared_ptr<CmtRCommitPhaseOutput>, shared_ptr<CmtCommitValue>> ac_p2(shared_ptr<CmtWithProofsReceiver> receiver, long id_x_r, string x_name, string r_name);
+
+  pair<shared_ptr<CmtRCommitPhaseOutput>, shared_ptr<CmtCommitValue>> ac_p2(shared_ptr<CmtWithProofsReceiver> receiver, long id_x_r, string x_name);
 
   pair<biginteger, biginteger> act_p1(int n, int l);
 

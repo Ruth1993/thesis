@@ -79,7 +79,7 @@ void Party::send_pk() {
 /*
 *   Send asymmetric ciphertext to other party
 */
-void Party::send_elgamal_msg(shared_ptr<AsymmetricCiphertext> c_m) {
+void Party::send_msg_enc(shared_ptr<AsymmetricCiphertext> c_m) {
   shared_ptr<AsymmetricCiphertextSendableData> c_m_sendable = ((ElGamalOnGroupElementCiphertext*) c_m.get())->generateSendableData();
   string c_m_sendable_string = c_m_sendable->toString();
   channel->writeWithSize(c_m_sendable_string);
@@ -97,9 +97,12 @@ void Party::send_aes_msg(shared_ptr<SymmetricCiphertext> c_m) {
 *   Send encrypted vector to other party
 */
 void Party::send_vec_enc(vector<shared_ptr<AsymmetricCiphertext>> vec_enc) {
-  for(shared_ptr<AsymmetricCiphertext> elem : vec_enc) {
-    send_elgamal_msg(elem);
-  }
+	//first send size of vector to the other party
+	send_msg(vec_enc.size());
+
+	for(shared_ptr<AsymmetricCiphertext> elem : vec_enc) {
+		send_msg_enc(elem);
+	}
 }
 
 /*
@@ -111,7 +114,7 @@ void Party::send_template(shared_ptr<Template_enc> T_enc) {
   for(int i=0; i<size.first; i++) {
     for(int j=0; j<size.second; j++) {
       shared_ptr<AsymmetricCiphertext> elem = T_enc->get_elem(i, j);
-      send_elgamal_msg(elem);
+      send_msg_enc(elem);
     }
   }
 }
@@ -151,7 +154,7 @@ shared_ptr<PublicKey> Party::recv_pk() {
 /*
 *   Receive asymmetric ciphertext from the other party
 */
-shared_ptr<AsymmetricCiphertext> Party::recv_elgamal_msg() {
+shared_ptr<AsymmetricCiphertext> Party::recv_msg_enc() {
   shared_ptr<AsymmetricCiphertext> c_m;
 
   shared_ptr<AsymmetricCiphertextSendableData> c_m_sendable = make_shared<ElGamalOnGrElSendableData>(dlog->getGenerator()->generateSendableData(), dlog->getGenerator()->generateSendableData());
@@ -165,29 +168,33 @@ shared_ptr<AsymmetricCiphertext> Party::recv_elgamal_msg() {
 
 
 /*
-*   Receive symmetric ciphertext from the other party
+*   Receive symmetric ciphertext (AES encryption) from the other party
 */
 shared_ptr<SymmetricCiphertext> Party::recv_aes_msg() {
-  shared_ptr<IVCiphertext> c_m;
+  vector<byte> empty;
+  shared_ptr<SymmetricCiphertext> c_m = make_shared<IVCiphertext>(make_shared<ByteArraySymCiphertext>(empty), empty);
 
   vector<byte> raw_msg;
-  cout << "before reading into vector" << endl;
-	channel->readWithSizeIntoVector(raw_msg);
-	cout << "before init from byte vector" << endl;
-  c_m->initFromByteVector(raw_msg); 
-  cout << "after init from byte vector" << endl;
+  channel->readWithSizeIntoVector(raw_msg);
+
+  const byte* uc = &(raw_msg[0]);
+  string msg = string(reinterpret_cast<char const*>(uc), raw_msg.size());
+  c_m->initFromString(msg);
 
   return c_m;
 }
 
 /*
-*   Receive encrypted vector from the other party
+*   Receive encrypted vector (asymmetric ciphertext) from the other party
 */
-vector<shared_ptr<AsymmetricCiphertext>> Party::recv_vec_enc(int size) {
+vector<shared_ptr<AsymmetricCiphertext>> Party::recv_vec_enc() {
   vector<shared_ptr<AsymmetricCiphertext>> vec_enc;
 
+  //first fetch size of vector sent by the other party
+  int size = stoi(recv_msg());
+
   for(int i=0; i<size; i++) {
-    shared_ptr<AsymmetricCiphertext> elem = recv_elgamal_msg();
+    shared_ptr<AsymmetricCiphertext> elem = recv_msg_enc();
     vec_enc.push_back(elem);
   }
 
@@ -202,7 +209,7 @@ shared_ptr<Template_enc> Party::recv_template() {
 
   for(int i=0; i<template_size.first; i++) {
     for(int j=0; j<template_size.second; j++) {
-      shared_ptr<AsymmetricCiphertext> s_enc = recv_elgamal_msg();
+      shared_ptr<AsymmetricCiphertext> s_enc = recv_msg_enc();
 
       //T_enc.add_elem(s_enc, i);
 		T_enc.set_elem(s_enc, i, j);
@@ -216,8 +223,18 @@ biginteger Party::random_bit() {
 	return getRandomInRange(0, 1, get_seeded_prg().get());
 }
 
+/*
+*	Generate random bit string of n bits long that does not exceed q
+*/
 biginteger Party::random_bitstring(int bits) {
-	return getRandomInRange(0, (biginteger) pow(2, bits), get_seeded_prg().get());
+	biginteger q = dlog->getOrder();
+	biginteger result = getRandomInRange(0, q - 1, get_seeded_prg().get());
+
+	if (bits > 0 && bits < NumberOfBits(q)) {
+		result = getRandomInRange(0, (biginteger) pow(2, bits), get_seeded_prg().get());
+	}
+
+	return result;
 }
 
 /*
@@ -292,28 +309,72 @@ int Party::bct_p2() {
 }
 
 /*
+*	Authenticated Computation protocol for party 1
+*/
+void Party::ac_p1(shared_ptr<CmtWithProofsCommitter> committer, biginteger x, biginteger r, long id_x_r, string x_name, string r_name) {
+	//compute commitment over x using randomness r and perform ZKPOK to prove knowledge of x
+	shared_ptr<CmtCommitValue> com_x = make_shared<CmtBigIntegerCommitValue>(make_shared<biginteger>(x));
+	cout << "committing on " << x_name << " using random-tape " << r_name << "..." << endl;
+	committer->commit(com_x, r, id_x_r);
+	committer->decommit(id_x_r);
+
+	//prove knowledge on com(x,r)
+	cout << "proving knowledge on com(" << x_name << "," << r_name << ")..." << endl;
+	committer->proveKnowledge(id_x_r);
+}
+
+void Party::ac_p1(shared_ptr<CmtWithProofsCommitter> committer, biginteger x, long id_x_r, string x_name) {
+	biginteger r = getRandomInRange(0, dlog->getOrder()-1, get_seeded_prg().get());
+
+	ac_p1(committer, x, r, id_x_r, x_name, "-random-");
+}
+
+/*
+*	Authenticated Computation protocol for party 2
+*/
+pair<shared_ptr<CmtRCommitPhaseOutput>, shared_ptr<CmtCommitValue>> Party::ac_p2(shared_ptr<CmtWithProofsReceiver> receiver, long id_x_r, string x_name, string r_name) {
+	//receive commitment over r' from p1
+	auto com_x = receiver->receiveCommitment();
+	auto result_x_r = receiver->receiveDecommitment(id_x_r);
+	if (result_x_r == NULL) {
+		cout << "commitment of " << x_name << " using randomness " << r_name << " failed" << endl;
+	}
+	else {
+		cout << "succesfully obtained commitment over " << x_name << " using randomness " << r_name << endl;
+		cout << x_name << ": " << result_x_r->toString() << endl;
+	}
+
+	//verify zkpofover commitment of r
+	cout << "ZKPOF on com(" << x_name << "," << r_name << ") accepted: " << receiver->verifyKnowledge(id_x_r) << endl;
+
+	return make_pair(com_x, result_x_r);
+}
+
+pair<shared_ptr<CmtRCommitPhaseOutput>, shared_ptr<CmtCommitValue>> Party::ac_p2(shared_ptr<CmtWithProofsReceiver> receiver, long id_x_r, string x_name) {
+	return ac_p2(receiver, id_x_r, x_name, "-random-");
+}
+
+/*
 *	Augmented Coin Tossing for party 1
 */
 pair<biginteger, biginteger> Party::act_p1(int n, int l) {
 	cout << "------------AUGMENTED COIN TOSSING FOR P1-----------" << endl;
 
-	CmtPedersenWithProofsCommitter committer(channel, 40, dlog);
+	shared_ptr<CmtWithProofsCommitter> committer = make_shared<CmtPedersenWithProofsCommitter>(channel, 40, dlog);
+
+	biginteger q = dlog->getOrder();
 
 	//select r' = \sigma_1,...,\sigma_l \in (0,1) and s=s_1,...,s_l \in (0,1)^n
 	biginteger r_acc = random_bitstring(l);
 	cout << "r': " << r_acc << endl;
-	biginteger s = random_bitstring(n * l);
+
+	biginteger s = random_bitstring(n*l);
 	cout << "s: " << s << endl;
 
-	//compute commitment over r' using randomness s and perform ZKPOK to prove knowledge of r'
-	shared_ptr<CmtCommitValue> com_r_acc = make_shared<CmtBigIntegerCommitValue>(make_shared<biginteger>(r_acc));
-	long id_r_acc = 0;
-	cout << "committing on r' using randomness s..." << endl;
-	committer.commit(com_r_acc, s, id_r_acc);
-	committer.decommit(id_r_acc);
+	long id_r_acc_s = 0;
 
-	cout << "proving knowledge on com(r',s)..." << endl;
-	committer.proveKnowledge(id_r_acc);
+	//engage in Authenticated Computation protocol with p2
+	ac_p1(committer, r_acc, s, id_r_acc_s, "r'", "s");
 
 	//p1 and p2 engage in BCT protocol l times to generate r_acc2
 	biginteger r_acc2;
@@ -330,21 +391,15 @@ pair<biginteger, biginteger> Party::act_p1(int n, int l) {
 
 	cout << "compute r = r' xor r'': " << r << endl;
 
-	//compute commitment over r and perform ZKPOK to prove knowledge of r
-	shared_ptr<CmtCommitValue> com_r = make_shared<CmtBigIntegerCommitValue>(make_shared<biginteger>(r));
+	//compute commitment over r and send to p2 using authenticated computation protocol
 	long id_r = 1;
-	cout << "committing on r..." << endl;
-	committer.commit(com_r, id_r);
-	committer.decommit(id_r);
-
-	cout << "proving knowledge on com(r)..." << endl;
-	committer.proveKnowledge(id_r);
+	ac_p1(committer, r, id_r, "r");
 
 	cout << "----------------------------------------------------" << endl;
 
-	biginteger randomness = static_pointer_cast<BigIntegerRandomValue>(committer.getCommitmentPhaseValues(id_r)->getR())->getR();
+	biginteger randomtape = static_pointer_cast<BigIntegerRandomValue>(committer->getCommitmentPhaseValues(id_r)->getR())->getR();
 
-	return make_pair(r, randomness);
+	return make_pair(r, randomtape);
 }
 
 /*
@@ -353,22 +408,10 @@ pair<biginteger, biginteger> Party::act_p1(int n, int l) {
 shared_ptr<CmtRCommitPhaseOutput> Party::act_p2(int n, int l) {
 	cout << "------------AUGMENTED COIN TOSSING FOR P2-----------" << endl;
 
-	CmtPedersenWithProofsReceiver receiver(channel, 40, dlog);
+	shared_ptr<CmtWithProofsReceiver> receiver = make_shared<CmtPedersenWithProofsReceiver>(channel, 40, dlog);
 
-	//receive commitment over r' from p1
-	auto com_r_acc = receiver.receiveCommitment();
-	long id_r_acc = 0;
-	auto result_r_acc = receiver.receiveDecommitment(id_r_acc);
-	if (result_r_acc == NULL) {
-		cout << "commitment of r' using randomness s failed" << endl;
-	}
-	else {
-		cout << "succesfully obtained commitment over r' using randomness s" << endl;
-		cout << "r': " << result_r_acc->toString() << endl;
-	}
-
-	//verify zkpof-proof over commitment of r
-	cout << "ZKPOF-proof on com(r',s) accepted: " << receiver.verifyKnowledge(id_r_acc) << endl;
+	long id_r_acc_s = 0;
+	ac_p2(receiver, id_r_acc_s, "r'", "s");
 
 	//p1 and p2 engage in BCT protocol l times to generate r_acc2
 	biginteger r_acc2;
@@ -380,23 +423,13 @@ shared_ptr<CmtRCommitPhaseOutput> Party::act_p2(int n, int l) {
 
 	cout << "obtained r'' through BCT: " << r_acc2 << endl;
 
-	//receive commitment over r from p1
-	auto com_r = receiver.receiveCommitment();
+	//receive commitment over r from p1 and verify knowledge
 	long id_r = 1;
-	auto result_r = receiver.receiveDecommitment(id_r);
-	if (result_r == NULL) {
-		cout << "commitment failed" << endl;
-	}
-	else {
-		cout << "succesfully obtained commitment over r" << endl;
-		cout << "r: " << result_r->toString() << endl;
-	}
-
-	cout << "ZKPOF-proof on com(r) accepted: " << receiver.verifyKnowledge(id_r) << endl;
+	pair<shared_ptr<CmtRCommitPhaseOutput>, shared_ptr<CmtCommitValue>> com_r_result_r = ac_p2(receiver, id_r, "r");
 
 	cout << "----------------------------------------------------" << endl;
 
-	return com_r;
+	return com_r_result_r.first;
 }
 
 /*
@@ -407,34 +440,25 @@ biginteger Party::ic_p1(biginteger x) {
 
 	cout << "entering protocol with input x: " << x << endl;
 
-	CmtPedersenWithProofsCommitter committer(channel, 40, dlog);
+	shared_ptr<CmtWithProofsCommitter> committer = make_shared<CmtPedersenWithProofsCommitter>(channel, 40, dlog);
 
 	//compute commitment over x and perform ZKPOF on com(x,r')
-	shared_ptr<CmtCommitValue> com_x = make_shared<CmtBigIntegerCommitValue>(make_shared<biginteger>(x));
 	cout << "number of bits:" << NumberOfBits(x) << endl;
 	int n = NumberOfBits(x);
-	biginteger r_acc = random_bitstring(pow(2, n));
+	cout << "n^2: " << pow(n, 2) << endl;
+	biginteger r_acc = random_bitstring(pow(n, 2));
 	long id_x_r_acc = 0;
-	cout << "committing on x using randomness r'..." << endl;
-	committer.commit(com_x, r_acc, id_x_r_acc);
-	committer.decommit(id_x_r_acc);
 
-	cout << "proving knowledge on com(x,r')..." << endl;
-	committer.proveKnowledge(id_x_r_acc);
+	ac_p1(committer, x, r_acc, id_x_r_acc, "x", "r'");
 
 	//perform augmented coin tossing protocol to obtain output (r, r'')
-	pair<biginteger, biginteger> r_r_acc2 = act_p1(pow(2,n), n);
+	pair<biginteger, biginteger> r_r_acc2 = act_p1(pow(n, 2), n);
 	biginteger r = r_r_acc2.first;
 	biginteger r_acc2 = r_r_acc2.second;
 
-	//compute com(x,r) and perform ZKPOF on com(x,r)
-	cout << "committing on x using randomness r..." << endl;
+	//compute com(x,r) and send to p2 using authenticated computation protocol
 	long id_x_r = 1;
-	committer.commit(com_x, r, id_x_r);
-	committer.decommit(id_x_r);
-
-	cout << "proving knowledge on com(x,r)..." << endl;
-	committer.proveKnowledge(id_x_r);
+	ac_p1(committer, x, r, id_x_r, "x", "r");
 
 	cout << "----------------------------------------------------" << endl;
 
@@ -447,41 +471,21 @@ biginteger Party::ic_p1(biginteger x) {
 shared_ptr<CmtRCommitPhaseOutput> Party::ic_p2() {
 	cout << "------------INPUT COMMITMENT FOR P2-----------------" << endl;
 
-	CmtPedersenWithProofsReceiver receiver(channel, 40, dlog);
+	shared_ptr<CmtWithProofsReceiver> receiver = make_shared<CmtPedersenWithProofsReceiver>(channel, 40, dlog);
 
-	//receive commitment over x from p1
-	auto com_x_r_acc = receiver.receiveCommitment();
+	//receive commitment over x from p1 using authenticated computation protocol
 	long id_x_r_acc = 0;
-	auto result_x_r_acc = receiver.receiveDecommitment(id_x_r_acc);
-	if (result_x_r_acc == NULL) {
-		cout << "commitment of x using randomness r' failed" << endl;
-	}
-	else {
-		cout << "succesfully obtained commitment over x using randomness r'" << endl;
-		cout << "x: " << result_x_r_acc->toString() << endl;
-	}
-
-	//verify ZKPOF over com(x,r')
-	cout << "ZKPOF on com(x,r') accepted: " << receiver.verifyKnowledge(id_x_r_acc) << endl;
+	pair<shared_ptr<CmtRCommitPhaseOutput>, shared_ptr<CmtCommitValue>> com_x_r_acc_result_x_r_acc = ac_p2(receiver, id_x_r_acc, "x", "r'");
+	auto com_x_r_acc = com_x_r_acc_result_x_r_acc.first;
+	auto result_x_r_acc = com_x_r_acc_result_x_r_acc.second;
 
 	//perform augmented coin tossing protocol to obtain output c'' = com(r, r'')
 	int n = NumberOfBits(*((biginteger*) result_x_r_acc->getX().get()));
 	auto com_r_r_acc = act_p2(pow(2, n), n);
 
-	//receive commitment over x using randomness r
-	auto com_x_r = receiver.receiveCommitment();
+	//receive com(x,r) from p1 using authenticated computation protocol
 	long id_x_r = 1;
-	auto result_x_r = receiver.receiveDecommitment(id_x_r);
-	if (result_x_r == NULL) {
-		cout << "commitment of x using randomness r failed" << endl;
-	}
-	else {
-		cout << "succesfully obtained commitment over x using randomness r" << endl;
-		cout << "x: " << result_x_r->toString() << endl;
-	}
-
-	//verify ZKPOF over com(x,r)
-	cout << "ZKPOF on com(x,r) accepted: " << receiver.verifyKnowledge(id_x_r) << endl;
+	auto com_x_r = ac_p2(receiver, id_x_r, "x", "r");
 
 	cout << "----------------------------------------------------" << endl;
 }

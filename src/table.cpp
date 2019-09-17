@@ -26,7 +26,7 @@ pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> Table::g
 
   for(Table_Entry entry : table) {
     if(entry.u == u) {
-      key_pair = make_pair(entry.K_enc, entry.K_aes);
+      key_pair = make_pair(entry.k_enc, entry.aes_k_1);
     }
   }
 
@@ -36,19 +36,19 @@ pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> Table::g
 /*
 *   Add entry to table
 */
-void Table::add_entry(int u, shared_ptr<Template_enc> T_enc, shared_ptr<AsymmetricCiphertext> K_enc, shared_ptr<SymmetricCiphertext> K_aes) {
-  Table_Entry entry = {u, T_enc, K_enc, K_aes};
+void Table::add_entry(int u, shared_ptr<Template_enc> T_enc, shared_ptr<AsymmetricCiphertext> k_enc, shared_ptr<SymmetricCiphertext> aes_k_1) {
+  Table_Entry entry = {u, T_enc, k_enc, aes_k_1};
   table.push_back(entry);
 }
 
 /*
 *   Replace old key pair by new key pair
 */
-void Table::change_key_pair(int u, shared_ptr<AsymmetricCiphertext> K_enc, shared_ptr<SymmetricCiphertext> K_aes) {
+void Table::change_key_pair(int u, shared_ptr<AsymmetricCiphertext> k_enc, shared_ptr<SymmetricCiphertext> aes_k_1) {
   for(Table_Entry entry : table) {
     if(entry.u == u) {
-      entry.K_enc = K_enc;
-      entry.K_aes = K_aes;
+      entry.k_enc = k_enc;
+      entry.aes_k_1 = aes_k_1;
     }
   }
 }

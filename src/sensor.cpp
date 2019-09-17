@@ -34,13 +34,11 @@ Sensor::Sensor(string config_file_path) {
 *		Captures vec_p with identity claim u
 */
 pair<int, vector<int>> Sensor::capture(int u, pair<int, int> template_size) {
-	cout << "capture(): u: " << u << endl;
-
 	vector<int> vec_p;
 
-	int len = pow(2, template_size.second);
+	int len = template_size.second;
 
-	cout << "vec(p): ";
+	cout << "capture():		u: " << u << "		vec(p): ";
 
 	for(int i=0; i<template_size.first; i++) {
 		unsigned seed = chrono::system_clock::now().time_since_epoch().count();
@@ -396,40 +394,40 @@ int Sensor::main_sh() {
 		key_setup(pk_sv);
 
 		//Create enrollment parameters and send to server
-		int u = 1;
-		tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enrollment = enroll(u, template_size, min_s, max_s);
+		int u_enroll = 1;
+		tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enrollment = enroll(u_enroll, template_size, min_s, max_s);
 		send_msg(get<0>(enrollment)); //send u
-		shared_ptr<AsymmetricCiphertext> test = get<2>(enrollment).first;
+		send_template(get<1>(enrollment)); //send template T_u
+		send_msg_enc(get<2>(enrollment).first); //send [[k]]
+		send_aes_msg(get<2>(enrollment).second); //send AES_k(1)
 
-		shared_ptr<Plaintext> p_test = elgamal->decrypt(test.get());
-		cout << "test: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)p_test.get())->getElement()).get())->getElementValue() << endl;
+		//Capture (u, vec(p))
+		pair<int, vector<int>> cap = capture(u_enroll, template_size);
+		int u = cap.first;
+		vector<int> vec_p = cap.second;
 
-		send_elgamal_msg(test);
-		/*vector<shared_ptr<AsymmetricCiphertext>> vec_test;
-		vec_test.push_back(test);
-		send_vec_enc(vec_test);
-		vector<shared_ptr<AsymmetricCiphertext>> vec_test2 = recv_vec_enc(1);
+		//Send u to server
+		send_msg(u);
 
-		for(shared_ptr<AsymmetricCiphertext> elem : vec_test2) {
-			shared_ptr<Plaintext> p_elem = elgamal->decrypt(elem.get());
-			cout << "elem: " << ((OpenSSLZpSafePrimeElement *)(((GroupElementPlaintext*)p_elem.get())->getElement()).get())->getElementValue() << endl;
-		}*/
-		shared_ptr<Template_enc> T_enc = get<1>(enrollment);
-		send_template(T_enc); //send [[T_u]]
+		//Receive template T_U from server
+		shared_ptr<Template_enc> T_enc = recv_template();
 
+		//Lookup vec_p in [[T_u]] and add up partial similarity scores
+		vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc = look_up(vec_p, T_enc);
+		shared_ptr<AsymmetricCiphertext> S_enc = add_scores(vec_s_enc);
 
-		shared_ptr<SymmetricCiphertext> aes_k_1 = get<2>(enrollment).second;
-		shared_ptr<Plaintext> test_dec = aes_enc->decrypt((IVCiphertext*) aes_k_1.get());
-		biginteger decryption_int = byte_to_int(((ByteArrayPlaintext *)test_dec.get())->getText());
+		//Send [[S]] to server
+		send_msg_enc(S_enc);
 
-		cout << "AES_k(1) decrypted: " << decryption_int << endl;
+		//Receive pair ([vec_B], AES_k(1)) from server
+		vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc2 = recv_vec_enc();
+		shared_ptr<SymmetricCiphertext> aes_k_1 = recv_aes_msg();
 
-		//send_aes_msg(aes_k_1);
-		//shared_ptr<SymmetricCiphertext> aes_k_1_2 = recv_aes_msg();
-		//shared_ptr<Plaintext> decryption = aes_enc->decrypt((IVCiphertext*) aes_k_1_2.get());
-		//biginteger decryption_int = byte_to_int(((ByteArrayPlaintext *)decryption.get())->getText());
+		//Fully decrypt [vec_B] and check if it consists a valid key
+		vector<shared_ptr<GroupElement>> vec_B = decrypt_vec_B_enc2(vec_B_enc2);
+		shared_ptr<GroupElement> key = check_key(vec_B, aes_k_1);
 
-		//cout << "AES_k(1) decrypted: " << decryption_int << endl;
+		cout << "Key: " << ((OpenSSLZpSafePrimeElement*)key.get())->getElementValue() << endl;
 
 		io_service.stop();
 		t.join();
@@ -444,10 +442,32 @@ int Sensor::main_sh() {
 *		Main function for malicious protocol
 */
 int Sensor::main_mal() {
-	pair<biginteger, biginteger> r_randomness = act_p1(3, 5);
-	biginteger x = getRandomInRange(0, dlog->getOrder() - 1, get_seeded_prg().get());
-	biginteger r = ic_p1(x);
-	cout << "r: " << r << endl;
+	try {
+		//First set up channel
+		boost::asio::io_service io_service;
+
+		SocketPartyData server = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8000);
+		SocketPartyData sensor = SocketPartyData(boost_ip::address::from_string("127.0.0.1"), 8001);
+
+		channel = make_shared<CommPartyTCPSynced>(io_service, sensor, server);
+
+		boost::thread t(boost::bind(&boost::asio::io_service::run, &io_service));
+
+		//Join channel
+		channel->join(500, 5000);
+		cout << "channel established" << endl;
+
+		pair<biginteger, biginteger> r_randomness = act_p1(3, 5);
+		biginteger x = getRandomInRange(0, dlog->getOrder() - 1, get_seeded_prg().get());
+		biginteger r = ic_p1(x);
+		cout << "r: " << r << endl;
+
+		io_service.stop();
+		t.join();
+	}
+	catch (const logic_error& e) {
+		cerr << e.what();
+	}
 
 	return 0;
 }

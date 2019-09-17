@@ -16,8 +16,8 @@ private:
   struct Table_Entry {
     int u;
     shared_ptr<Template_enc> T_enc;
-    shared_ptr<AsymmetricCiphertext> K_enc;
-    shared_ptr<SymmetricCiphertext> K_aes;
+    shared_ptr<AsymmetricCiphertext> k_enc;
+    shared_ptr<SymmetricCiphertext> aes_k_1;
   };
 
   vector<Table_Entry> table;
@@ -27,9 +27,9 @@ public:
 
   pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> get_key_pair(int u);
 
-  void add_entry(int u, shared_ptr<Template_enc> T_enc, shared_ptr<AsymmetricCiphertext> K_enc, shared_ptr<SymmetricCiphertext> K_aes);
+  void add_entry(int u, shared_ptr<Template_enc> T_enc, shared_ptr<AsymmetricCiphertext> k_enc, shared_ptr<SymmetricCiphertext> aes_k_1);
 
-  void change_key_pair(int u, shared_ptr<AsymmetricCiphertext> K_enc, shared_ptr<SymmetricCiphertext> K_aes);
+  void change_key_pair(int u, shared_ptr<AsymmetricCiphertext> k_enc, shared_ptr<SymmetricCiphertext> aes_k_1);
 
   void remove_entry(int u);
 
