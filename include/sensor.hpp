@@ -1,3 +1,8 @@
+/*
+*	Created using libscapi (see https://crypto.biu.ac.il/SCAPI/)
+*	Authors: Ruth Scholten
+*/
+
 #ifndef SENSOR_H
 #define SENSOR_H
 

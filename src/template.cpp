@@ -1,3 +1,11 @@
+/*
+*	Created using libscapi (see https://crypto.biu.ac.il/SCAPI/)
+*	Authors: Ruth Scholten
+/*
+*	Created using libscapi (see https://crypto.biu.ac.il/SCAPI/)
+*	Authors: Ruth Scholten
+*/
+
 #include <vector>
 #include <math.h>
 

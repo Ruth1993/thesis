@@ -1,3 +1,8 @@
+/*
+*	Created using libscapi (see https://crypto.biu.ac.il/SCAPI/)
+*	Authors: Ruth Scholten
+*/
+
 #ifndef TABLE_H
 #define TABLE_H
 
