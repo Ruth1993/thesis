@@ -56,6 +56,6 @@ public:
 
 void key_gen(int lambda);
 
-int main(int argc, char* argv[]);
+int main_schnorr(int argc, char* argv[]);
 
 #endif

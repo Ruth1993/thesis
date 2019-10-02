@@ -7,35 +7,8 @@
 
 using namespace std;
 
-
 /*
-*		Convert an integer to byte array
-*/
-vector<unsigned char> Party::int_to_byte(int a) {
-  vector<unsigned char> result(4);
-
-  for(int i=0; i<4; i++) {
-    result[i] = (a >> (8*(3-i)));
-  }
-
-  return result;
-}
-
-/*
-*	 Convert a byte array to integer
-*/
-int Party::byte_to_int(vector<unsigned char> vec) {
-  int result = 0;
-
-  for(int i=0; i<vec.size(); i++) {
-    result = (result << 8) + vec[i];
-  }
-
-  return result;
-}
-
-/*
-*		Pad input with zeros (least significant bits) to match number of bits
+*	Pad input with zeros (least significant bits) to match number of bits
 */
 void Party::pad(vector<unsigned char> &input, int bits) {
 	int i = bits-input.size()*8;
@@ -48,7 +21,7 @@ void Party::pad(vector<unsigned char> &input, int bits) {
 }
 
 /*
-*		Setup shared public key for double encryption
+*	Setup shared public key for double encryption
 */
 void Party::key_setup(shared_ptr<PublicKey> pk_other) {
 	shared_ptr<GroupElement> h_shared = dlog->exponentiate(((ElGamalPublicKey*) pk_other.get())->getH().get(), ((ElGamalPrivateKey*) sk_own.get())->getX());

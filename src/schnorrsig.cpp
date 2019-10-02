@@ -48,16 +48,17 @@ Signature Signer::sign(vector<byte> msg) {
 	vector<byte> c_byte;
 	H->hashFinal(c_byte, 0);
 
-	//compute s = alpha*c + k \in Z_q
 	byte c_byte_arr[c_byte.size()];
 	copy_byte_vector_to_byte_array(c_byte, c_byte_arr, 0);
 
 	biginteger c = mod(decodeBigInteger(c_byte_arr, c_byte.size()), q);
+	cout << "c without mod: " << decodeBigInteger(c_byte_arr, c_byte.size()) << endl;
 	cout << "c in signer: " << c << endl;
-	cout << "-c in signer: " << c * -1 << endl;
-	auto y_times_min_c = dlog->exponentiate(y.get(), c * -1);
-	cout << "y * -c in signer: " << ((OpenSSLZpSafePrimeElement*)y_times_min_c.get())->getElementValue() << endl;
+	cout << "-c in signer: " << mod(c * -1, q) << endl;
+	auto y_pow_min_c = dlog->exponentiate(y.get(), mod(c * -1, q));
+	cout << "y * -c in signer: " << ((OpenSSLZpSafePrimeElement*)y_pow_min_c.get())->getElementValue() << endl;
 	cout << "alpha in signer: " << alpha << endl;
+	//compute s = alpha*c + k \in Z_q
 	biginteger s = mod(alpha * c + k, q);
 
 	cout << "s in signer: " << s << endl;
@@ -65,12 +66,22 @@ Signature Signer::sign(vector<byte> msg) {
 	auto g_pow_s = dlog->exponentiate(g.get(), s);
 	cout << "g^s in signer: " << ((OpenSSLZpSafePrimeElement*)g_pow_s.get())->getElementValue() << endl;
 
-	byte c_mod_byte_arr[c_byte.size()];
-	encodeBigInteger(c, c_mod_byte_arr, c_byte.size());
-	vector<byte> c_mod_byte;
-	copy_byte_array_to_byte_vector(c_mod_byte_arr, c_byte.size(), c_mod_byte, 0);
+	auto v = dlog->multiplyGroupElements(g_pow_s.get(), y_pow_min_c.get());
+	cout << "v in signer: " << ((OpenSSLZpSafePrimeElement*)v.get())->getElementValue() << endl;
 
-	Signature sig = { s, c_byte };
+	byte c_mod_byte_arr[bytesCount(c)];
+	encodeBigInteger(c, c_mod_byte_arr, bytesCount(c));
+	vector<byte> c_mod_byte;
+	copy_byte_array_to_byte_vector(c_mod_byte_arr, bytesCount(c), c_mod_byte, 0);
+
+	print_byte_array(c_mod_byte_arr, bytesCount(c), "c_mod_byte_array: ");
+	for (int i = 0; i < bytesCount(c); i++) {
+		cout << c_byte[i] << ",";
+	}
+
+	cout << endl << endl;
+
+	Signature sig = { s, c_mod_byte };
 
 	return sig;
 }
@@ -91,6 +102,8 @@ shared_ptr<GroupElement> Verifier::recv_pk() {
 }
 
 bool Verifier::verify(vector<byte> msg, Signature sig, shared_ptr<GroupElement> y) {
+	biginteger q = dlog->getOrder();
+
 	biginteger s = sig.s;
 	vector<byte> c_byte = sig.c;
 	byte c_byte_arr[c_byte.size()];
@@ -101,11 +114,14 @@ bool Verifier::verify(vector<byte> msg, Signature sig, shared_ptr<GroupElement> 
 
 	//compute v = g^s * y^-c \in Z_p
 	auto g = dlog->getGenerator();
-	auto y_times_min_c = dlog->exponentiate(y.get(), c * -1);
-	cout << "y * -c in verifier: " << ((OpenSSLZpSafePrimeElement*)y_times_min_c.get())->getElementValue() << endl;
+	auto y_pow_min_c = dlog->exponentiate(y.get(), mod(c * -1, q));
+	cout << "-c in verifier: " << mod(c * -1, q) << endl;
+	cout << "y * -c in verifier: " << ((OpenSSLZpSafePrimeElement*)y_pow_min_c.get())->getElementValue() << endl;
 	auto g_pow_s = dlog->exponentiate(g.get(), s);
 	cout << "g^s in verifier: " << ((OpenSSLZpSafePrimeElement*)g_pow_s.get())->getElementValue() << endl;
-	auto v = dlog->multiplyGroupElements(dlog->exponentiate(g.get(), s).get(), dlog->exponentiate(y.get(), c*-1).get());
+	//auto v = dlog->multiplyGroupElements(dlog->exponentiate(g.get(), s).get(), dlog->exponentiate(y.get(), c*-1).get());
+	auto v = dlog->multiplyGroupElements(g_pow_s.get(), y_pow_min_c.get());
+	cout << "v in verifier: " << ((OpenSSLZpSafePrimeElement*)v.get())->getElementValue() << endl;
 
 	//compute hash = H(m || v)
 	vector<byte> v_byte = dlog->decodeGroupElementToByteArray(v.get());
@@ -115,6 +131,18 @@ bool Verifier::verify(vector<byte> msg, Signature sig, shared_ptr<GroupElement> 
 	H->update(msg_v, 0, msg_v.size());
 	vector<byte> hash;
 	H->hashFinal(hash, 0);
+
+	print_byte_array(c_byte_arr, c_byte.size(), "c_byte: ");
+	byte hash_arr[hash.size()];
+	copy_byte_vector_to_byte_array(hash, hash_arr, 0);
+	print_byte_array(hash_arr, hash.size(), "H(m || v): ");
+
+	byte c_mod_byte_arr[c_byte.size()];
+	encodeBigInteger(c, c_mod_byte_arr, c_byte.size());
+	vector<byte> c_mod_byte;
+	copy_byte_array_to_byte_vector(c_mod_byte_arr, c_byte.size(), c_mod_byte, 0);
+
+	cout << "c_byte == c_mod_byte: " << (c_byte == c_mod_byte) << endl;
 
 	return (c_byte == hash);
 }
@@ -154,7 +182,7 @@ void key_gen(int lambda) {
 }
 
 
-int main(int argc, char* argv[]) {
+int main_schnorr(int argc, char* argv[]) {
 	shared_ptr<Signer> signer = make_shared<Signer>();
 	shared_ptr<Verifier> verifier = make_shared<Verifier>();
 

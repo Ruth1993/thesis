@@ -25,13 +25,15 @@ public:
 
 	shared_ptr<Template_enc> fetch_template(int u);
 
-	vector<shared_ptr<AsymmetricCiphertext>> compare(shared_ptr<AsymmetricCiphertext> cap_s_enc, biginteger t, biginteger max_S);
+	vector<shared_ptr<AsymmetricCiphertext>> compare(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S);
 
-	vector<shared_ptr<AsymmetricCiphertext>> permute(vector<shared_ptr<AsymmetricCiphertext>> cap_c_enc);
+	vector<shared_ptr<AsymmetricCiphertext>> permute(vector<shared_ptr<AsymmetricCiphertext>> C_enc);
+
+	vector<shared_ptr<AsymmetricCiphertext>> permute_mal(vector<shared_ptr<AsymmetricCiphertext>> C_enc);
 
 	pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> fetch_key_pair(int u);
 
-	vector<shared_ptr<AsymmetricCiphertext>> calc_vec_B_enc(vector<shared_ptr<AsymmetricCiphertext>> vec_cap_c_enc2, shared_ptr<AsymmetricCiphertext> cap_k_enc2);
+	vector<shared_ptr<AsymmetricCiphertext>> calc_vec_B_enc(vector<shared_ptr<AsymmetricCiphertext>> vec_C_enc2, shared_ptr<AsymmetricCiphertext> cap_k_enc2);
 
 	vector<shared_ptr<AsymmetricCiphertext>> D1(vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc);
 
@@ -41,7 +43,7 @@ public:
 
 	void test_compare(biginteger t, biginteger max_s);
 
-	void test_permute(biginteger cap_s, biginteger t, biginteger max_s);
+	void test_permute(biginteger S, biginteger t, biginteger max_s);
 
 	shared_ptr<ElGamalOnGroupElementCiphertext> test_D1(shared_ptr<AsymmetricCiphertext> cipher);
 

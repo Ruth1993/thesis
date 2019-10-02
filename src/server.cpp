@@ -132,6 +132,49 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::permute(vector<shared_ptr<Asymm
 	return vec_C_enc;
 }
 
+vector<shared_ptr<AsymmetricCiphertext>> Server::permute_mal(vector<shared_ptr<AsymmetricCiphertext>> C_enc) {
+	auto g = dlog->getGenerator();
+	biginteger q = dlog->getOrder();
+	auto gen = get_seeded_prg();
+
+	int n = C_enc.size();
+
+	//Prover generates the following random integers \in Z_q:
+	biginteger sigma = getRandomInRange(0, q - 1, gen.get());
+	biginteger rho = getRandomInRange(0, q - 1, gen.get());
+	biginteger tau = getRandomInRange(0, q - 1, gen.get());
+	biginteger alpha = getRandomInRange(0, q - 1, gen.get());
+	vector<biginteger> alpha_i;
+
+	for (int i = 0; i < n; i++) {
+		alpha_i.push_back(getRandomInRange(0, q - 1, gen.get()));
+	}
+
+	biginteger lambda = getRandomInRange(0, q - 1, gen.get());
+
+	vector<biginteger> lambda_i;
+
+	for (int i = 0; i < n; i++) {
+		lambda_i.push_back(getRandomInRange(0, q - 1, gen.get()));
+	}
+
+	//Prover computes the following elements \in Z*_p:
+	auto t = dlog->exponentiate(g.get(), tau);
+	auto v = dlog->exponentiate(g.get(), rho);
+	auto w = dlog->exponentiate(g.get(), sigma);
+	auto u = dlog->exponentiate(g.get(), lambda);
+	vector<shared_ptr<GroupElement>> u_i;
+
+	for (int i = 0; i < n; i++) {
+		u_i.push_back(dlog->exponentiate(g.get(), lambda_i[i]));
+	}
+
+	//Randomly generate permutation matrix A_{ij}
+	vector<vector<int>> A = permutation_matrix(n);
+
+	return vector<shared_ptr<AsymmetricCiphertext>>();
+}
+
 /*
 *		Fetch key pair ([[k]], AES_k(1)) corresponding to u from table
 */
@@ -348,6 +391,8 @@ int Server::main_sh() {
 		send_vec_enc(vec_B_enc2);
 		send_aes_msg(key_pair.second);
 
+		vector<shared_ptr<AsymmetricCiphertext>> test = permute_mal(vec_C_enc);
+
 		io_service.stop();
 		th.join();
 	} catch (const logic_error& e) {
@@ -375,8 +420,8 @@ int Server::main_mal() {
 		channel->join(500, 5000);
 		cout << "channel established" << endl;
 
-		auto com_r = act_p2(3, 5);
-		auto com_x = ic_p2();
+		//auto com_r = act_p2(3, 5);
+		//auto com_x = ic_p2();
 
 		io_service.stop();
 		th.join();

@@ -462,10 +462,10 @@ int Sensor::main_mal() {
 		channel->join(500, 5000);
 		cout << "channel established" << endl;
 
-		pair<biginteger, biginteger> r_randomness = act_p1(3, 5);
+		/*pair<biginteger, biginteger> r_randomness = act_p1(3, 5);
 		biginteger x = getRandomInRange(0, dlog->getOrder() - 1, get_seeded_prg().get());
 		biginteger r = ic_p1(x);
-		cout << "r: " << r << endl;
+		cout << "r: " << r << endl;*/
 
 		io_service.stop();
 		t.join();

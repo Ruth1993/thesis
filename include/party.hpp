@@ -21,6 +21,7 @@
 #include <boost/thread/thread.hpp>
 
 #include "template.hpp"
+#include "math.hpp"
 
 class Party {
 protected:
@@ -43,10 +44,6 @@ protected:
   const biginteger max_S = template_size.first * max_s;
 
 public:
-  vector<unsigned char> int_to_byte(int a);
-
-  int byte_to_int(vector<unsigned char> vec);
-
   void pad(vector<unsigned char> &input, int bytes);
 
   shared_ptr<PublicKey> recv_pk();

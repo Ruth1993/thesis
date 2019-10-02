@@ -10,4 +10,12 @@
 
 biginteger mod(biginteger a, biginteger b);
 
+vector<unsigned char> int_to_byte(int a);
+
+int byte_to_int(vector<unsigned char> vec);
+
+vector<vector<int>> permutation_matrix(int size);
+
+int main();
+
 #endif
