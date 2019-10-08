@@ -37,12 +37,28 @@ void Party::key_setup(shared_ptr<PublicKey> pk_other) {
 *   Send unencrypted message to other party
 */
 void Party::send_msg(string msg) {
-  channel->writeWithSize(msg);
+	channel->writeWithSize(msg);
 }
 
 void Party::send_msg(int msg) {
-  string msg_string = to_string(msg);
-  send_msg(msg_string);
+	string msg_string = to_string(msg);
+	send_msg(msg_string);
+}
+
+void Party::send_biginteger(biginteger msg) {
+	size_t length = bytesCount(msg);
+	byte output[length];
+	encodeBigInteger(msg, output, length);
+	channel->writeWithSize(output, length);
+}
+
+/*
+*	Send group element to other party
+*/
+void Party::send_group_element(shared_ptr<GroupElement> elem) {
+	auto elem_sendable = elem->generateSendableData();
+	string elem_sendable_string = elem_sendable->toString();
+	channel->writeWithSize(elem_sendable_string);
 }
 
 /*
@@ -69,6 +85,30 @@ void Party::send_msg_enc(shared_ptr<AsymmetricCiphertext> c_m) {
 void Party::send_aes_msg(shared_ptr<SymmetricCiphertext> c_m) {
 	string c_m_string = c_m->toString();
 	channel->writeWithSize(c_m_string);
+}
+
+/*
+*	Send group of bigintegers to other party
+*/
+void Party::send_vec_biginteger(vector<biginteger> vec_biginteger) {
+	//first send size of vector to the other party
+	send_msg(vec_biginteger.size());
+
+	for (biginteger elem : vec_biginteger) {
+		send_biginteger(elem);
+	}
+}
+
+/*
+*   Send vector of group elements to other party
+*/
+void Party::send_vec_group_element(vector<shared_ptr<GroupElement>> vec_group_element) {
+	//first send size of vector to the other party
+	send_msg(vec_group_element.size());
+
+	for (shared_ptr<GroupElement> elem : vec_group_element) {
+		send_group_element(elem);
+	}
 }
 
 /*
@@ -111,8 +151,31 @@ string Party::recv_msg() {
   return msg;
 }
 
+biginteger Party::recv_biginteger() {
+	vector<byte> raw_msg;
+	channel->readWithSizeIntoVector(raw_msg);
+	const byte* uc = &(raw_msg[0]);
+	
+	return decodeBigInteger(uc, raw_msg.size());
+}
+
 /*
-*		Receive public key from connected party
+*	Receive group element from other party
+*/
+shared_ptr<GroupElement> Party::recv_group_element() {
+	shared_ptr<GroupElement> elem;
+
+	shared_ptr<GroupElementSendableData> elem_sendable = make_shared<ZpElementSendableData>(dlog->getOrder());
+	vector<byte> raw_msg;
+	channel->readWithSizeIntoVector(raw_msg);
+	elem_sendable->initFromByteVector(raw_msg);
+	elem = dlog->reconstructElement(true, elem_sendable.get());
+
+	return elem;
+}
+
+/*
+*	Receive public key from other party
 */
 shared_ptr<PublicKey> Party::recv_pk() {
   shared_ptr<PublicKey> pk_sv;
@@ -160,6 +223,40 @@ shared_ptr<SymmetricCiphertext> Party::recv_aes_msg() {
   c_m->initFromString(msg);
 
   return c_m;
+}
+
+/*
+*	Receive vector of bigintegers from the other party
+*/
+vector<biginteger> Party::recv_vec_biginteger() {
+	vector<biginteger> vec_biginteger;
+
+	//first fetch size of vector sent by the other party
+	int size = stoi(recv_msg());
+
+	for (int i = 0; i < size; i++) {
+		biginteger elem = recv_biginteger();
+		vec_biginteger.push_back(elem);
+	}
+
+	return vec_biginteger;
+}
+
+/*
+*	Receive vector of group elements from the other party
+*/
+vector<shared_ptr<GroupElement>> Party::recv_vec_group_element() {
+	vector<shared_ptr<GroupElement>> vec_group_element;
+
+	//first fetch size of vector sent by the other party
+	int size = stoi(recv_msg());
+
+	for (int i = 0; i < size; i++) {
+		shared_ptr<GroupElement> elem = recv_group_element();
+		vec_group_element.push_back(elem);
+	}
+
+	return vec_group_element;
 }
 
 /*

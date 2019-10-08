@@ -51,18 +51,30 @@ vector<vector<int>> permutation_matrix(int size) {
 	unsigned seed = chrono::system_clock::now().time_since_epoch().count();
 	shuffle(r.begin(), r.end(), default_random_engine(seed));
 
-
 	for (int i = 0; i < size; i++) {
-		int bit_set = r[i];
-
-		for (int j = 0; j < size; j++) {
-			A[i][j] = (j == bit_set);
-		}
+		A[i][r[i]] = 1;
 	}
 
 	return A;
 }
 
-int main() {
+/*
+*	Print permutation matrix A_{ij}
+*/
+void print_permutation_matrix(vector<vector<int>> A) {
+	int size = A.size();
+
+	cout << "A_{ij}: " << endl;
+	for (int i = 0; i < size; i++) {
+		for (int j = 0; j < size; j++) {
+			cout << A[i][j];
+		}
+
+		cout << endl;
+	}
+	cout << endl;
+}
+
+int main_math() {
 	vector<vector<int>> A = permutation_matrix(5);
 }

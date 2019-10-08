@@ -54,11 +54,19 @@ public:
 
   void send_msg(int msg);
 
+  void send_biginteger(biginteger msg);
+
+  void send_group_element(shared_ptr<GroupElement> elem);
+
   void send_pk();
 
   void send_msg_enc(shared_ptr<AsymmetricCiphertext> c_m);
 
   void send_aes_msg(shared_ptr<SymmetricCiphertext> c_m);
+
+  void send_vec_biginteger(vector<biginteger> vec_biginteger);
+
+  void send_vec_group_element(vector<shared_ptr<GroupElement>> vec_group_element);
 
   void send_vec_enc(vector<shared_ptr<AsymmetricCiphertext>> vec_enc);
 
@@ -66,9 +74,17 @@ public:
 
   string recv_msg();
 
+  biginteger recv_biginteger();
+
+  shared_ptr<GroupElement> recv_group_element();
+
   shared_ptr<AsymmetricCiphertext> recv_msg_enc();
 
   shared_ptr<SymmetricCiphertext> recv_aes_msg();
+
+  vector<biginteger> recv_vec_biginteger();
+
+  vector<shared_ptr<GroupElement>> recv_vec_group_element();
 
   vector<shared_ptr<AsymmetricCiphertext>> recv_vec_enc();
 

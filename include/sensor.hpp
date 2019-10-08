@@ -32,9 +32,11 @@ public:
 
 	shared_ptr<AsymmetricCiphertext> add_scores(vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc);
 
-	vector<shared_ptr<GroupElement>> decrypt_vec_B_enc2(vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc);
+	bool verify_permutation();
 
-	shared_ptr<GroupElement> check_key(vector<shared_ptr<GroupElement>> vec_B, shared_ptr<SymmetricCiphertext> aes_K);
+	vector<shared_ptr<GroupElement>> decrypt_B_enc2(vector<shared_ptr<AsymmetricCiphertext>> B_enc);
+
+	shared_ptr<GroupElement> check_key(vector<shared_ptr<GroupElement>> B, shared_ptr<SymmetricCiphertext> aes_K);
 
 	void test_look_up();
 

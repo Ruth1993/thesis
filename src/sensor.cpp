@@ -78,20 +78,20 @@ shared_ptr<Template_enc> Sensor::encrypt_template(Template T) {
 
 	auto g = dlog->getGenerator();
 
-	for(vector<biginteger> vec_col : T.T) {
-		vector<shared_ptr<AsymmetricCiphertext>> vec_col_enc;
+	for(vector<biginteger> Col : T.T) {
+		vector<shared_ptr<AsymmetricCiphertext>> Col_enc;
 
-		for(biginteger s : vec_col) {
+		for(biginteger s : Col) {
 			//first encode s_{i,j} as g^s_{i,j}
 			auto s_prime = dlog->exponentiate(g.get(), s);
 
 			GroupElementPlaintext p(s_prime);
 			shared_ptr<AsymmetricCiphertext> cipher = elgamal->encrypt(make_shared<GroupElementPlaintext>(p));
 
-			vec_col_enc.push_back(cipher);
+			Col_enc.push_back(cipher);
 		}
 
-		T_enc.add_col(vec_col_enc);
+		T_enc.add_col(Col_enc);
 	}
 
 	return make_shared<Template_enc>(T_enc);
@@ -200,31 +200,79 @@ shared_ptr<AsymmetricCiphertext> Sensor::add_scores(vector<shared_ptr<Asymmetric
 }
 
 /*
-*		Decrypt all the values in [vec_B]
+*	Verify correctness of permutation function \pi
 */
-vector<shared_ptr<GroupElement>> Sensor::decrypt_vec_B_enc2(vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc2) {
-	vector<shared_ptr<GroupElement>> vec_B;
+bool Sensor::verify_permutation() {
+	biginteger q = dlog->getOrder();
+	auto gen = get_seeded_prg();
 
-	for(int i=0; i<vec_B_enc2.size(); i++) {
-		shared_ptr<Plaintext> plaintext = elgamal->decrypt(vec_B_enc2[i].get());
-		shared_ptr<GroupElement> B_i = ((GroupElementPlaintext*)plaintext.get())->getElement();
-		vec_B.push_back(B_i);
-		//cout << "B_" << i << ": " << ((OpenSSLZpSafePrimeElement *)B_i.get())->getElementValue() << endl;
+	//Receive parameters from prover
+	auto t = recv_group_element();
+	auto v = recv_group_element();
+	auto w = recv_group_element();
+	auto u = recv_group_element();
+	vector<shared_ptr<GroupElement>> vec_u = recv_vec_group_element();
+	vector<shared_ptr<GroupElement>> vec_g_tilde_prime = recv_vec_group_element();
+	auto g_tilde_prime = recv_group_element();
+	auto g_prime = recv_group_element();
+	auto m_prime = recv_group_element();
+	vector<shared_ptr<GroupElement>> vec_t_dot = recv_vec_group_element();
+	vector<shared_ptr<GroupElement>> vec_v_dot = recv_vec_group_element();
+	auto v_dot = recv_group_element();
+	vector<shared_ptr<GroupElement>> vec_w_dot = recv_vec_group_element();
+	auto w_dot = recv_group_element();
+
+	int n = vec_u.size();
+
+	cout << "n: " << n << endl;
+
+	//Compute challenges c_i for 0 <= i < n
+	vector<biginteger> c;
+
+	for (int i = 0; i < n; i++) {
+		c.push_back(getRandomInRange(0, q - 1, gen.get()));
 	}
 
-	return vec_B;
+	//Send challenges to prover
+	send_vec_biginteger(c);
+
+	//Receive s, s_i and \lambda' from prover
+	biginteger s = recv_biginteger();
+	vector<biginteger> vec_s = recv_vec_biginteger();
+	biginteger lambda_prime = recv_biginteger();
+
+	//Verify following statements
+
+
+	return false;
 }
 
 /*
-*		For every value in vec_B, check if AES_{B_i} == 1. In case there is such a value, B_i is the key that is released by the system and can be used by the sensor device for further applications
+*		Decrypt all the values in [B]
 */
-shared_ptr<GroupElement> Sensor::check_key(vector<shared_ptr<GroupElement>> vec_B, shared_ptr<SymmetricCiphertext> aes_k) {
+vector<shared_ptr<GroupElement>> Sensor::decrypt_B_enc2(vector<shared_ptr<AsymmetricCiphertext>> B_enc2) {
+	vector<shared_ptr<GroupElement>> B;
+
+	for(int i=0; i<B_enc2.size(); i++) {
+		shared_ptr<Plaintext> plaintext = elgamal->decrypt(B_enc2[i].get());
+		shared_ptr<GroupElement> B_i = ((GroupElementPlaintext*)plaintext.get())->getElement();
+		B.push_back(B_i);
+		//cout << "B_" << i << ": " << ((OpenSSLZpSafePrimeElement *)B_i.get())->getElementValue() << endl;
+	}
+
+	return B;
+}
+
+/*
+*		For every value in B, check if AES_{B_i} == 1. In case there is such a value, B_i is the key that is released by the system and can be used by the sensor device for further applications
+*/
+shared_ptr<GroupElement> Sensor::check_key(vector<shared_ptr<GroupElement>> B, shared_ptr<SymmetricCiphertext> aes_k) {
 	auto g = dlog->getGenerator();
 
 	auto result = dlog->exponentiate(g.get(), 0); //initiate result with g^0 = 1
 
-	for(int i=0; i<vec_B.size(); i++) {
-		vector<unsigned char> B_i_bytes = dlog->decodeGroupElementToByteArray(vec_B[i].get());
+	for(int i=0; i<B.size(); i++) {
+		vector<unsigned char> B_i_bytes = dlog->decodeGroupElementToByteArray(B[i].get());
 		pad(B_i_bytes, 128);
 
 		SecretKey aes_B_i_sk = SecretKey(B_i_bytes, "");
@@ -233,10 +281,10 @@ shared_ptr<GroupElement> Sensor::check_key(vector<shared_ptr<GroupElement>> vec_
 		shared_ptr<Plaintext> decryption = aes_enc->decrypt(aes_k.get());
 		biginteger decryption_int = byte_to_int(((ByteArrayPlaintext *)decryption.get())->getText());
 
-		//cout << "B_" << i << ": " << ((OpenSSLZpSafePrimeElement *)vec_B[i].get())->getElementValue() << endl;
+		//cout << "B_" << i << ": " << ((OpenSSLZpSafePrimeElement *)B[i].get())->getElementValue() << endl;
 
 		if(decryption_int == 1) {
-			result = vec_B[i];
+			result = B[i];
 			break;
 		}
 	}
@@ -383,7 +431,7 @@ int Sensor::main_sh() {
 
 		channel = make_shared<CommPartyTCPSynced>(io_service, sensor, server);
 
-		boost::thread t(boost::bind(&boost::asio::io_service::run, &io_service));
+		boost::thread th(boost::bind(&boost::asio::io_service::run, &io_service));
 
 		//Join channel
 		channel->join(500, 5000);
@@ -424,18 +472,18 @@ int Sensor::main_sh() {
 		//Send [[S]] to server
 		send_msg_enc(S_enc);
 
-		//Receive pair ([vec_B], AES_k(1)) from server
-		vector<shared_ptr<AsymmetricCiphertext>> vec_B_enc2 = recv_vec_enc();
+		//Receive pair ([B], AES_k(1)) from server
+		vector<shared_ptr<AsymmetricCiphertext>> B_enc2 = recv_vec_enc();
 		shared_ptr<SymmetricCiphertext> aes_k_1 = recv_aes_msg();
 
-		//Fully decrypt [vec_B] and check if it consists a valid key
-		vector<shared_ptr<GroupElement>> vec_B = decrypt_vec_B_enc2(vec_B_enc2);
-		shared_ptr<GroupElement> key = check_key(vec_B, aes_k_1);
+		//Fully decrypt [B] and check if it consists a valid key
+		vector<shared_ptr<GroupElement>> B = decrypt_B_enc2(B_enc2);
+		shared_ptr<GroupElement> key = check_key(B, aes_k_1);
 
 		cout << "Key: " << ((OpenSSLZpSafePrimeElement*)key.get())->getElementValue() << endl;
 
 		io_service.stop();
-		t.join();
+		th.join();
 	} catch (const logic_error& e) {
 			cerr << e.what();
 	}
@@ -456,19 +504,16 @@ int Sensor::main_mal() {
 
 		channel = make_shared<CommPartyTCPSynced>(io_service, sensor, server);
 
-		boost::thread t(boost::bind(&boost::asio::io_service::run, &io_service));
+		boost::thread th(boost::bind(&boost::asio::io_service::run, &io_service));
 
 		//Join channel
 		channel->join(500, 5000);
 		cout << "channel established" << endl;
 
-		/*pair<biginteger, biginteger> r_randomness = act_p1(3, 5);
-		biginteger x = getRandomInRange(0, dlog->getOrder() - 1, get_seeded_prg().get());
-		biginteger r = ic_p1(x);
-		cout << "r: " << r << endl;*/
+		bool test = verify_permutation();
 
 		io_service.stop();
-		t.join();
+		th.join();
 	}
 	catch (const logic_error& e) {
 		cerr << e.what();

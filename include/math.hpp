@@ -16,6 +16,8 @@ int byte_to_int(vector<unsigned char> vec);
 
 vector<vector<int>> permutation_matrix(int size);
 
-int main();
+int main_math();
+
+void print_permutation_matrix(vector<vector<int>> A);
 
 #endif
