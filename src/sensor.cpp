@@ -202,9 +202,14 @@ shared_ptr<AsymmetricCiphertext> Sensor::add_scores(vector<shared_ptr<Asymmetric
 /*
 *	Verify correctness of permutation function \pi
 */
-bool Sensor::verify_permutation() {
+bool Sensor::verify_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime) {
+	auto g = dlog->getGenerator();
 	biginteger q = dlog->getOrder();
 	auto gen = get_seeded_prg();
+
+	//Receive \tilde{g} and {\tilde_i} from the prover
+	auto g_tilde = recv_group_element();
+	vector<shared_ptr<GroupElement>> vec_g_tilde = recv_vec_group_element();
 
 	//Receive parameters from prover
 	auto t = recv_group_element();
@@ -224,8 +229,6 @@ bool Sensor::verify_permutation() {
 
 	int n = vec_u.size();
 
-	cout << "n: " << n << endl;
-
 	//Compute challenges c_i for 0 <= i < n
 	vector<biginteger> c;
 
@@ -241,10 +244,50 @@ bool Sensor::verify_permutation() {
 	vector<biginteger> vec_s = recv_vec_biginteger();
 	biginteger lambda_prime = recv_biginteger();
 
-	//Verify following statements
+	//Verify following statements (in paper Furukawa statements 11-16)
+	auto left11 = dlog->exponentiate(g_tilde.get(), s);
+	auto right11 = g_tilde_prime;
 
+	auto left12 = dlog->exponentiate(g.get(), s);
+	auto right12 = g_prime;
 
-	return false;
+	auto left13 = dlog->exponentiate(((ElGamalPublicKey*) pk_shared.get())->getH().get(), s);
+	auto right13 = m_prime;
+
+	auto left14 = dlog->exponentiate(g.get(), lambda_prime);
+	auto right14 = u;
+
+	auto left15 = dlog->multiplyGroupElements(dlog->exponentiate(t.get(), lambda_prime).get(), dlog->exponentiate(v.get(), s).get());
+	auto right15 = v_dot;
+
+	auto left16 = dlog->exponentiate(w.get(), s);
+	auto right16 = w_dot;
+
+	for (int j = 0; j < n; j++) {
+		auto g_j = ((ElGamalOnGroupElementCiphertext*) C_enc[j].get())->getC1();
+		auto g_j_prime = ((ElGamalOnGroupElementCiphertext*) C_enc_prime[j].get())->getC1();
+		auto m_j = ((ElGamalOnGroupElementCiphertext*) C_enc[j].get())->getC2();
+		auto m_j_prime = ((ElGamalOnGroupElementCiphertext*) C_enc_prime[j].get())->getC2();
+
+		left11 = dlog->multiplyGroupElements(left11.get(), dlog->exponentiate(vec_g_tilde[j].get(), vec_s[j]).get());
+		right11 = dlog->multiplyGroupElements(right11.get(), dlog->exponentiate(vec_g_tilde_prime[j].get(), c[j]).get());
+
+		left12 = dlog->multiplyGroupElements(left12.get(), dlog->exponentiate(g_j.get(), vec_s[j]).get());
+		right12 = dlog->multiplyGroupElements(right12.get(), dlog->exponentiate(g_j_prime.get(), c[j]).get());
+
+		left13 = dlog->multiplyGroupElements(left13.get(), dlog->exponentiate(m_j.get(), vec_s[j]).get());
+		right13 = dlog->multiplyGroupElements(right13.get(), dlog->exponentiate(m_j_prime.get(), c[j]).get());
+
+		right14 = dlog->multiplyGroupElements(right14.get(), dlog->exponentiate(vec_u[j].get(), mod(c[j]*c[j], q)).get());
+
+		left15 = dlog->multiplyGroupElements(left15.get(), dlog->exponentiate(g.get(), mod(vec_s[j]*vec_s[j]*vec_s[j] - c[j]*c[j]*c[j], q)).get());
+		right15 = dlog->multiplyGroupElements(right15.get(), dlog->multiplyGroupElements(dlog->exponentiate(vec_v_dot[j].get(), c[j]).get(), dlog->exponentiate(vec_t_dot[j].get(), mod(c[j] * c[j], q)).get()).get());
+
+		left16 = dlog->multiplyGroupElements(left16.get(), dlog->exponentiate(g.get(), mod(vec_s[j] * vec_s[j] - c[j] * c[j], q)).get());
+		right16 = dlog->multiplyGroupElements(right16.get(), dlog->exponentiate(vec_w_dot[j].get(), c[j]).get());
+	}
+	
+	return (*left11.get() == *right11.get()) && (*left12.get() == *right12.get()) && (*left13.get() == *right13.get()) && (*left14.get() == *right14.get()) && (*left15.get() == *right15.get()) && (*left16.get() == *right16.get());
 }
 
 /*
@@ -510,7 +553,57 @@ int Sensor::main_mal() {
 		channel->join(500, 5000);
 		cout << "channel established" << endl;
 
-		bool test = verify_permutation();
+		//Receive public key from server
+		shared_ptr<PublicKey> pk_sv = recv_pk();
+
+		//Send own public key to Server
+		send_pk();
+
+		//Set shared public key
+		key_setup(pk_sv);
+
+		//Create enrollment parameters and send to server
+		int u_enroll = 1;
+		tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enrollment = enroll(u_enroll, template_size, min_s, max_s);
+		send_msg(get<0>(enrollment)); //send u
+		send_template(get<1>(enrollment)); //send template T_u
+		send_msg_enc(get<2>(enrollment).first); //send [[k]]
+		send_aes_msg(get<2>(enrollment).second); //send AES_k(1)
+
+		//Capture (u, vec(p))
+		pair<int, vector<int>> cap = capture(u_enroll, template_size);
+		int u = cap.first;
+		vector<int> vec_p = cap.second;
+
+		//Send u to server
+		send_msg(u);
+
+		//Receive template T_U from server
+		shared_ptr<Template_enc> T_enc = recv_template();
+
+		//Lookup vec_p in [[T_u]] and add up partial similarity scores
+		vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc = look_up(vec_p, T_enc);
+		shared_ptr<AsymmetricCiphertext> S_enc = add_scores(vec_s_enc);
+
+		//Send [[S]] to server
+		send_msg_enc(S_enc);
+
+		//Receive [[C]] and [[C']] from server
+		vector<shared_ptr<AsymmetricCiphertext>> C_enc = recv_vec_enc();
+		vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime = recv_vec_enc();
+
+		//Verify permutation \pi([[C]] = [[C']]
+		cout << "permutation verified: " << verify_permutation(C_enc, C_enc_prime) << endl;
+
+		//Receive pair ([B], AES_k(1)) from server
+		vector<shared_ptr<AsymmetricCiphertext>> B_enc2 = recv_vec_enc();
+		shared_ptr<SymmetricCiphertext> aes_k_1 = recv_aes_msg();
+
+		//Fully decrypt [B] and check if it consists a valid key
+		vector<shared_ptr<GroupElement>> B = decrypt_B_enc2(B_enc2);
+		shared_ptr<GroupElement> key = check_key(B, aes_k_1);
+
+		cout << "Key: " << ((OpenSSLZpSafePrimeElement*)key.get())->getElementValue() << endl;
 
 		io_service.stop();
 		th.join();

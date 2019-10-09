@@ -109,7 +109,7 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::compare(shared_ptr<AsymmetricCi
 */
 tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>, vector<vector<int>>> Server::permute(vector<shared_ptr<AsymmetricCiphertext>> C_enc) {
 	vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime;
-	vector<biginteger> r_i;
+	vector<biginteger> vec_r;
 
 	int n = C_enc.size();
 	auto g = dlog->getGenerator();
@@ -121,7 +121,7 @@ tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>, vector<vecto
 	for (int i = 0; i < n; i++) {
 		biginteger r = getRandomInRange(0, q - 1, get_seeded_prg().get());
 		auto vec_g_prime = dlog->exponentiate(g.get(), r);
-		auto vec_m_prime = dlog->exponentiate(((ElGamalPublicKey*) pk_own.get())->getH().get(), r); //TODO change to pk_shared
+		auto vec_m_prime = dlog->exponentiate(((ElGamalPublicKey*) pk_shared.get())->getH().get(), r);
 
 		for (int j = 0; j < n; j++) {
 			if (A[j][i] == 1) {
@@ -130,30 +130,33 @@ tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>, vector<vecto
 			}
 		}
 
-		r_i.push_back(r);
+		vec_r.push_back(r);
 		C_enc_prime.push_back(make_shared<ElGamalOnGroupElementCiphertext>(vec_g_prime, vec_m_prime));
 	}
 
-	return make_tuple(C_enc_prime, r_i, A);
+	return make_tuple(C_enc_prime, vec_r, A);
 }
 
 /*
 *	Prove permute function has been executed in a semi-honest fashion
 */
-void Server::prove_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime, vector<biginteger> r_i, vector<vector<int>> A) {
+void Server::prove_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime, vector<biginteger> vec_r, vector<vector<int>> A) {
 	auto g = dlog->getGenerator();
 	biginteger q = dlog->getOrder();
 	auto gen = get_seeded_prg();
 
 	int n = C_enc.size();
 
-	//First the prover generates randomly \tilde{g}, {\tilde{g}_i} for 0 <= i < n
+	//The prover generates randomly \tilde{g}, {\tilde{g}_i} for 0 <= i < n and sends these to the verifier
 	auto g_tilde = dlog->createRandomGenerator();
 	vector<shared_ptr<GroupElement>> vec_g_tilde;
 
 	for (int i = 0; i < n; i++) {
 		vec_g_tilde.push_back(dlog->exponentiate(g_tilde.get(), getRandomInRange(0, q-1, gen.get())));
 	}
+
+	send_group_element(g_tilde);
+	send_vec_group_element(vec_g_tilde);
 
 	//1. Prover generates the following random integers \in Z_q:
 	biginteger sigma = getRandomInRange(0, q - 1, gen.get());
@@ -188,16 +191,16 @@ void Server::prove_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, v
 
 	auto g_tilde_prime = dlog->exponentiate(g_tilde.get(), alpha);
 	auto g_prime = dlog->exponentiate(g.get(), alpha);
-	auto m_prime = dlog->exponentiate(((ElGamalPublicKey*) pk_own.get())->getH().get(), alpha); //TODO change to pk_shared
-	biginteger exp_v_dot;
-	biginteger exp_w_dot;
+	auto m_prime = dlog->exponentiate(((ElGamalPublicKey*) pk_shared.get())->getH().get(), alpha);
+	biginteger exp_v_dot = tau * lambda + rho * alpha;
+	biginteger exp_w_dot = sigma * alpha;
 
 	for (int j = 0; j < n; j++) {
 		g_tilde_prime = dlog->multiplyGroupElements(g_tilde_prime.get(), dlog->exponentiate(vec_g_tilde[j].get(), vec_alpha[j]).get());
 		g_prime = dlog->multiplyGroupElements(g_prime.get(), dlog->exponentiate(((ElGamalOnGroupElementCiphertext*) C_enc[j].get())->getC1().get(), vec_alpha[j]).get());
 		m_prime = dlog->multiplyGroupElements(m_prime.get(), dlog->exponentiate(((ElGamalOnGroupElementCiphertext*) C_enc[j].get())->getC2().get(), vec_alpha[j]).get());
-		exp_v_dot = mod(exp_v_dot + (pow(vec_alpha[j], 3) + tau*lambda + rho*alpha), q);
-		exp_w_dot = mod(exp_w_dot + (pow(vec_alpha[j], 2) + sigma* alpha), q);
+		exp_v_dot = mod(exp_v_dot + vec_alpha[j]* vec_alpha[j]* vec_alpha[j], q);
+		exp_w_dot = mod(exp_w_dot + vec_alpha[j]*vec_alpha[j], q);
 	}
 
 	auto v_dot = dlog->exponentiate(g.get(), exp_v_dot);
@@ -209,16 +212,16 @@ void Server::prove_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, v
 	vector<shared_ptr<GroupElement>> vec_w_dot;
 
 	for (int i = 0; i < n; i++) {
-		auto vec_g_tilde_prime_elem = dlog->exponentiate(g_tilde.get(), r_i[i]);
-		biginteger exp_vec_t_dot;
-		biginteger exp_vec_v_dot;
-		biginteger exp_vec_w_dot;
+		auto vec_g_tilde_prime_elem = dlog->exponentiate(g_tilde.get(), vec_r[i]);
+		biginteger exp_vec_t_dot = tau * vec_lambda[i];
+		biginteger exp_vec_v_dot = rho * vec_r[i];
+		biginteger exp_vec_w_dot = sigma * vec_r[i];
 
 		for (int j = 0; j < n; j++) {
 			vec_g_tilde_prime_elem = dlog->multiplyGroupElements(vec_g_tilde_prime_elem.get(), dlog->exponentiate(vec_g_tilde[j].get(), A[j][i]).get());
-			exp_vec_t_dot = mod(exp_vec_t_dot + (3 * vec_alpha[j] * A[j][i] + tau * vec_lambda[j]), q);
-			exp_vec_v_dot = mod(exp_vec_v_dot + (3*pow(vec_alpha[j], 2) * A[j][i] + rho*r_i[j]), q);
-			exp_vec_w_dot = mod(exp_vec_w_dot + (2*vec_alpha[j]*A[j][i] + sigma*r_i[j]), q);
+			exp_vec_t_dot = mod(exp_vec_t_dot + (3 * vec_alpha[j] * A[j][i]), q);
+			exp_vec_v_dot = mod(exp_vec_v_dot + (3*vec_alpha[j]*vec_alpha[j] * A[j][i]), q);
+			exp_vec_w_dot = mod(exp_vec_w_dot + (2*vec_alpha[j]*A[j][i]), q);
 		}
 
 		vec_g_tilde_prime.push_back(vec_g_tilde_prime_elem);
@@ -228,50 +231,38 @@ void Server::prove_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, v
 	}
 
 	//3. Prover sends t, v, w, u, {vec_u}, {\tilde{g}_i}, \tilde{g}', g', m', {\dot{t}_i}, {\dot{v}_i}, {\dot{w}_i}, \dot{w} (i=1,...,n) to the verifier
-	cout << "t:";
 	send_group_element(t);
-	cout << "v:";
 	send_group_element(v);
-	cout << "w:";
 	send_group_element(w);
-	cout << "u:";
 	send_group_element(u);
-	cout << "{vec_u}:";
 	send_vec_group_element(vec_u);
-	cout << "g tilde i prime:";
 	send_vec_group_element(vec_g_tilde_prime);
-	cout << "g tilde prime:";
 	send_group_element(g_tilde_prime);
-	cout << "g prime:";
 	send_group_element(g_prime);
-	cout << "m prime:";
 	send_group_element(m_prime);
-	cout << "t dot i:";
 	send_vec_group_element(vec_t_dot);
-	cout << "v dot i:";
 	send_vec_group_element(vec_v_dot);
-	cout << "v dot:";
 	send_group_element(v_dot);
-	cout << "w dot i:";
 	send_vec_group_element(vec_w_dot);
-	cout << "w dot:";
 	send_group_element(w_dot);
 
 	//Prover receives challenges c and computes s, s_i and \lambda'
 	vector<biginteger> c = recv_vec_biginteger();
 
-	biginteger s;
+	biginteger s = alpha;
 	vector<biginteger> vec_s(n, 0);
-	biginteger lambda_prime;
+	biginteger lambda_prime = lambda;
 
 	for (int j = 0; j < n; j++) {
-		s = mod(s + r_i[j] * c[j] + alpha, q);
-		lambda_prime = mod(lambda_prime + vec_lambda[j] * pow(c[j], 2) + lambda, q);
+		s = mod(s + vec_r[j] * c[j], q);
+		lambda_prime = mod(lambda_prime + vec_lambda[j] * c[j]*c[j], q);
 	}
 
 	for (int i = 0; i < n; i++) {
+		vec_s[i] = vec_alpha[i];
+
 		for (int j = 0; j < n; j++) {
-			vec_s[i] = mod(vec_s[i] + A[i][j] * c[j] + vec_alpha[i], q);
+			vec_s[i] = mod(vec_s[i] + A[i][j] * c[j], q);
 		}
 	}
 
@@ -483,7 +474,7 @@ int Server::main_sh() {
 		//Compare [[S]] with t
 		vector<shared_ptr<AsymmetricCiphertext>> C_enc = compare(S_enc, t, max_S);
 
-		//Permute [[C]]
+		//Permute [[C]] to get [[C']
 		tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>, vector<vector<int>>> C_enc_prime = permute(C_enc);
 
 		//Fetch key pair ([[k]], AES_k(1)) from table
@@ -525,18 +516,67 @@ int Server::main_mal() {
 		channel->join(500, 5000);
 		cout << "channel established" << endl;
 
-		vector<shared_ptr<AsymmetricCiphertext>> vec;
+		//First send public key
+		send_pk();
 
-		for (int i = 0; i < 5; i++) {
-			auto elem = dlog->createRandomElement();
-			GroupElementPlaintext p(elem);
-			shared_ptr<AsymmetricCiphertext> c = elgamal->encrypt(make_shared<GroupElementPlaintext>(p));
-			vec.push_back(c);
-		}
+		//Receive public key from Sensor
+		shared_ptr<PublicKey> pk_ss = recv_pk();
 
-		tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>, vector<vector<int>>> perm = permute(vec);
+		//Set shared public keys
+		key_setup(pk_ss);
 
-		prove_permutation(vec, get<0>(perm), get<1>(perm), get<2>(perm));
+		//Receive enrollment parameters from sensor
+		int u_enroll = stoi(recv_msg()); //receive u
+		cout << "received enrollment from user u: " << u_enroll << endl;
+		shared_ptr<Template_enc> T_enc_enroll = recv_template(); //receive [[T_u]]
+		shared_ptr<AsymmetricCiphertext> k_enc_enroll = recv_msg_enc(); //receive [[k]]
+		shared_ptr<SymmetricCiphertext> aes_k_1_enroll = recv_aes_msg(); //receive AES_k(1)
+
+		//Store enrollment in table
+		store_table(u_enroll, T_enc_enroll, k_enc_enroll, aes_k_1_enroll);
+
+		//Receive identity claim u from sensor
+		int u = stoi(recv_msg());
+		cout << "received identity claim u: " << u << endl;
+
+		//Fetch T_u from table
+		shared_ptr<Template_enc> T_enc = fetch_template(u);
+
+		//Send T_u to sensor
+		send_template(T_enc);
+
+		//Receive [[S]] from sensor
+		shared_ptr<AsymmetricCiphertext> S_enc = recv_msg_enc();
+
+		//Compare [[S]] with t
+		vector<shared_ptr<AsymmetricCiphertext>> C_enc = compare(S_enc, t, max_S);
+
+		//Permute [[C]] to get [[C']
+		tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>, vector<vector<int>>> permutation = permute(C_enc);
+
+		vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime = get<0>(permutation);
+		vector<biginteger> r = get<1>(permutation);
+		vector<vector<int>> A = get<2>(permutation);
+
+		//Send [[C]] and [[C']] to sensor
+		send_vec_enc(C_enc);
+		send_vec_enc(C_enc_prime);
+
+		//Prove permutation function \pi([[C]] = [[C']]
+		prove_permutation(C_enc, C_enc_prime, r, A);
+
+		//Fetch key pair ([[k]], AES_k(1)) from table
+		pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> key_pair = fetch_key_pair(u);
+
+		//Multiply elements in [[C]] with [[k]]
+		vector<shared_ptr<AsymmetricCiphertext>> B_enc = calc_B_enc(C_enc_prime, key_pair.first);
+
+		//Perform partial decryption function D1
+		vector<shared_ptr<AsymmetricCiphertext>> B_enc2 = D1(B_enc);
+
+		//Send pair ([B], AES_k(1)) to sensor
+		send_vec_enc(B_enc2);
+		send_aes_msg(key_pair.second);
 
 		io_service.stop();
 		th.join();

@@ -32,7 +32,7 @@ public:
 
 	shared_ptr<AsymmetricCiphertext> add_scores(vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc);
 
-	bool verify_permutation();
+	bool verify_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime);
 
 	vector<shared_ptr<GroupElement>> decrypt_B_enc2(vector<shared_ptr<AsymmetricCiphertext>> B_enc);
 
