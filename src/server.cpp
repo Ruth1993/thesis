@@ -35,18 +35,49 @@ Server::Server(string config_file_path) {
 }
 
 /*
-*		Store enrollment of sensor in table
+*	Store enrollment of sensor in table (with signatures for malicious protocol)
 */
-void Server::store_table(int u, shared_ptr<Template_enc> T_enc, shared_ptr<AsymmetricCiphertext> c_k, shared_ptr<SymmetricCiphertext> aes_k_1) {
-	table.add_entry(u, T_enc, c_k, aes_k_1);
+void Server::store_table(int u, shared_ptr<Template_enc> T_enc, shared_ptr<AsymmetricCiphertext> c_k, shared_ptr<SymmetricCiphertext> aes_k_1, Signature sig_m, Signature sig_n, shared_ptr<GroupElement> y) {
+	table.add_entry(u, T_enc, c_k, aes_k_1, sig_m, sig_n, y);
 }
 
+/*
+*	Store enrollment parameters of sensor in table (without signatures for semi-honest protocol)
+*/
+void Server::store_table(int u, shared_ptr<Template_enc> T_enc, shared_ptr<AsymmetricCiphertext> c_k, shared_ptr<SymmetricCiphertext> aes_k_1) {
+	Signature sig_m;
+	Signature sig_n;
+	shared_ptr<GroupElement> y;
+
+	store_table(u, T_enc, c_k, aes_k_1, sig_m, sig_n, y);
+}
 
 /*
-*		Fetch template from table
+*	Fetch template from table
 */
 shared_ptr<Template_enc> Server::fetch_template(int u) {
 	return table.get_T_enc(u);
+}
+
+/*
+*	Fetch \sigma(m) from table
+*/
+Signature Server::fetch_sig_m(int u) {
+	return table.get_sig_m(u);
+}
+
+/*
+*	Fetch \sigma(n) from table
+*/
+Signature Server::fetch_sig_n(int u) {
+	return table.get_sig_n(u);
+}
+
+/*
+*	Fetch public key for signatures from table
+*/
+shared_ptr<GroupElement> Server::fetch_y(int u) {
+	return table.get_y(u);
 }
 
 /*
@@ -138,7 +169,7 @@ tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>, vector<vecto
 }
 
 /*
-*	Prove permute function has been executed in a semi-honest fashion
+*	Prove permutation function has been executed in a semi-honest fashion
 */
 void Server::prove_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime, vector<biginteger> vec_r, vector<vector<int>> A) {
 	auto g = dlog->getGenerator();
@@ -474,7 +505,7 @@ int Server::main_sh() {
 		//Compare [[S]] with t
 		vector<shared_ptr<AsymmetricCiphertext>> C_enc = compare(S_enc, t, max_S);
 
-		//Permute [[C]] to get [[C']
+		//Permute [[C]] to get [[C']]
 		tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>, vector<vector<int>>> C_enc_prime = permute(C_enc);
 
 		//Fetch key pair ([[k]], AES_k(1)) from table
@@ -525,25 +556,34 @@ int Server::main_mal() {
 		//Set shared public keys
 		key_setup(pk_ss);
 
-		//Receive enrollment parameters from sensor
+		//Receive enrollment parameters m and n and signatures \sigma(m) and \sigma(n) from sensor
 		int u_enroll = stoi(recv_msg()); //receive u
 		cout << "received enrollment from user u: " << u_enroll << endl;
 		shared_ptr<Template_enc> T_enc_enroll = recv_template(); //receive [[T_u]]
 		shared_ptr<AsymmetricCiphertext> k_enc_enroll = recv_msg_enc(); //receive [[k]]
 		shared_ptr<SymmetricCiphertext> aes_k_1_enroll = recv_aes_msg(); //receive AES_k(1)
+		Signature sig_m_enroll = recv_signature(); //receive \sigma(m)
+		Signature sig_n_enroll = recv_signature(); //receive \sigma(n)
 
 		//Store enrollment in table
-		store_table(u_enroll, T_enc_enroll, k_enc_enroll, aes_k_1_enroll);
+		store_table(u_enroll, T_enc_enroll, k_enc_enroll, aes_k_1_enroll, sig_m_enroll, sig_n_enroll);
 
 		//Receive identity claim u from sensor
 		int u = stoi(recv_msg());
 		cout << "received identity claim u: " << u << endl;
 
-		//Fetch T_u from table
+		//Fetch T_u, [[k]], AES_k(1), sig(m) and sig(n) from table
 		shared_ptr<Template_enc> T_enc = fetch_template(u);
+		pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> key_pair = fetch_key_pair(u);
+		Signature sig_m = fetch_sig_m(u);
+		Signature sig_n = fetch_sig_n(u);
 
-		//Send T_u to sensor
+		//Send T_u, [[k]], AES_k(1), sig(m) and sig(n) to sensor
 		send_template(T_enc);
+		send_msg_enc(key_pair.first);
+		send_aes_msg(key_pair.second);
+		send_signature(sig_m);
+		send_signature(sig_n);
 
 		//Receive [[S]] from sensor
 		shared_ptr<AsymmetricCiphertext> S_enc = recv_msg_enc();
@@ -565,18 +605,14 @@ int Server::main_mal() {
 		//Prove permutation function \pi([[C]] = [[C']]
 		prove_permutation(C_enc, C_enc_prime, r, A);
 
-		//Fetch key pair ([[k]], AES_k(1)) from table
-		pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> key_pair = fetch_key_pair(u);
-
 		//Multiply elements in [[C]] with [[k]]
 		vector<shared_ptr<AsymmetricCiphertext>> B_enc = calc_B_enc(C_enc_prime, key_pair.first);
 
 		//Perform partial decryption function D1
 		vector<shared_ptr<AsymmetricCiphertext>> B_enc2 = D1(B_enc);
 
-		//Send pair ([B], AES_k(1)) to sensor
+		//Send [B] to sensor
 		send_vec_enc(B_enc2);
-		send_aes_msg(key_pair.second);
 
 		io_service.stop();
 		th.join();

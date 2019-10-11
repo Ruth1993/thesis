@@ -13,14 +13,16 @@
 #include "../../libscapi/include/infra/ConfigFile.hpp"
 #include "../../libscapi/include/comm/Comm.hpp"
 #include "../../libscapi/include/infra/Scanner.hpp"
+#include "../../libscapi/include/mid_layer/ElGamalEnc.hpp"
 
 #include "../include/math.hpp"
+#include "../include/template.hpp"
 
 #include <vector>
 
 struct Signature {
 	biginteger s;
-	vector<byte> c;
+	biginteger c;
 };
 
 class Signer {
@@ -35,8 +37,6 @@ public:
 
 	Signer();
 
-	void send_pk(shared_ptr<GroupElement>);
-
 	Signature sign(vector<byte> msg);
 };
 
@@ -48,8 +48,6 @@ public:
 	shared_ptr<CryptographicHash> H;
 
 	Verifier();
-
-	shared_ptr<GroupElement> recv_pk();
 
 	bool verify(vector<byte> msg, Signature sig, shared_ptr<GroupElement>);
 };

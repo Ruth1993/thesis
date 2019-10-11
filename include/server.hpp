@@ -21,9 +21,17 @@ private:
 public:
 	Server(string config_file_path);
 
+	void store_table(int u, shared_ptr<Template_enc> T_enc, shared_ptr<AsymmetricCiphertext> c_k, shared_ptr<SymmetricCiphertext> aes_k_1, Signature sig_m, Signature sig_n);
+
 	void store_table(int u, shared_ptr<Template_enc> T_enc, shared_ptr<AsymmetricCiphertext> c_k, shared_ptr<SymmetricCiphertext> aes_k_1);
 
 	shared_ptr<Template_enc> fetch_template(int u);
+
+	Signature fetch_sig_m(int u);
+
+	Signature fetch_sig_n(int u);
+
+	shared_ptr<GroupElement> fetch_y(int u);
 
 	vector<shared_ptr<AsymmetricCiphertext>> compare(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S);
 

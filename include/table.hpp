@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "template.hpp"
+#include "schnorrsig.hpp"
 
 #include "../../libscapi/include/primitives/DlogOpenSSL.hpp"
 #include "../../libscapi/include/mid_layer/ElGamalEnc.hpp"
@@ -23,6 +24,9 @@ private:
     shared_ptr<Template_enc> T_enc;
     shared_ptr<AsymmetricCiphertext> k_enc;
     shared_ptr<SymmetricCiphertext> aes_k_1;
+	Signature sig_m;
+	Signature sig_n;
+	shared_ptr<GroupElement> y;
   };
 
   vector<Table_Entry> table;
@@ -32,9 +36,15 @@ public:
 
   pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> get_key_pair(int u);
 
-  void add_entry(int u, shared_ptr<Template_enc> T_enc, shared_ptr<AsymmetricCiphertext> k_enc, shared_ptr<SymmetricCiphertext> aes_k_1);
+  pair<Signature, shared_ptr<GroupElement>> get_sig_m(int u);
 
-  void change_key_pair(int u, shared_ptr<AsymmetricCiphertext> k_enc, shared_ptr<SymmetricCiphertext> aes_k_1);
+  pair<Signature, shared_ptr<GroupElement>> get_sig_n(int u);
+
+  shared_ptr<GroupElement> get_y(int u);
+
+  void add_entry(int u, shared_ptr<Template_enc> T_enc, shared_ptr<AsymmetricCiphertext> k_enc, shared_ptr<SymmetricCiphertext> aes_k_1, Signature sig_m, Signature sig_n, shared_ptr<GroupElement> y);
+
+  void change_key_pair(int u, shared_ptr<AsymmetricCiphertext> k_enc, shared_ptr<SymmetricCiphertext> aes_k_1, Signature sig_n, shared_ptr<GroupElement> y);
 
   void remove_entry(int u);
 

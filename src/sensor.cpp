@@ -142,7 +142,7 @@ tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shar
 	GroupElementPlaintext p_k(g_k);
 	shared_ptr<AsymmetricCiphertext> k_enc = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_k));
 
-	//Step 6: AES_k(1)
+	//Step 6: aes_k_1(1)
 	//First copy g_k to byte vector in order to use in AES encryption
 	vector<unsigned char> vec_k = dlog->decodeGroupElementToByteArray(g_k.get());
 
@@ -158,9 +158,9 @@ tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shar
 	vector<unsigned char> vec = int_to_byte(1);
 	ByteArrayPlaintext p1(vec);
 
-	shared_ptr<SymmetricCiphertext> aes_k = aes_enc->encrypt(&p1);
+	shared_ptr<SymmetricCiphertext> aes_k_1 = aes_enc->encrypt(&p1);
 
-	return make_tuple(u, T_enc, make_pair(k_enc, aes_k));
+	return make_tuple(u, T_enc, make_pair(k_enc, aes_k_1));
 }
 
 /*
@@ -309,7 +309,7 @@ vector<shared_ptr<GroupElement>> Sensor::decrypt_B_enc2(vector<shared_ptr<Asymme
 /*
 *		For every value in B, check if AES_{B_i} == 1. In case there is such a value, B_i is the key that is released by the system and can be used by the sensor device for further applications
 */
-shared_ptr<GroupElement> Sensor::check_key(vector<shared_ptr<GroupElement>> B, shared_ptr<SymmetricCiphertext> aes_k) {
+shared_ptr<GroupElement> Sensor::check_key(vector<shared_ptr<GroupElement>> B, shared_ptr<SymmetricCiphertext> aes_k_1) {
 	auto g = dlog->getGenerator();
 
 	auto result = dlog->exponentiate(g.get(), 0); //initiate result with g^0 = 1
@@ -321,7 +321,7 @@ shared_ptr<GroupElement> Sensor::check_key(vector<shared_ptr<GroupElement>> B, s
 		SecretKey aes_B_i_sk = SecretKey(B_i_bytes, "");
 		aes_enc->setKey(aes_B_i_sk);
 
-		shared_ptr<Plaintext> decryption = aes_enc->decrypt(aes_k.get());
+		shared_ptr<Plaintext> decryption = aes_enc->decrypt(aes_k_1.get());
 		biginteger decryption_int = byte_to_int(((ByteArrayPlaintext *)decryption.get())->getText());
 
 		//cout << "B_" << i << ": " << ((OpenSSLZpSafePrimeElement *)B[i].get())->getElementValue() << endl;
@@ -451,7 +451,7 @@ void Sensor::print_outcomes(int total) {
 }
 
 /*
-*		Show usage of the program
+*	Show usage of the program
 */
 int Sensor::usage() {
 	cout << "Usage: " << endl;
@@ -462,7 +462,7 @@ int Sensor::usage() {
 }
 
 /*
-*		Main function for semi-honest protocol
+*	Main function for semi-honest protocol
 */
 int Sensor::main_sh() {
 	try {
@@ -495,7 +495,7 @@ int Sensor::main_sh() {
 		send_msg(get<0>(enrollment)); //send u
 		send_template(get<1>(enrollment)); //send template T_u
 		send_msg_enc(get<2>(enrollment).first); //send [[k]]
-		send_aes_msg(get<2>(enrollment).second); //send AES_k(1)
+		send_aes_msg(get<2>(enrollment).second); //send aes_k_1(1)
 
 		//Capture (u, vec(p))
 		pair<int, vector<int>> cap = capture(u_enroll, template_size);
@@ -505,7 +505,7 @@ int Sensor::main_sh() {
 		//Send u to server
 		send_msg(u);
 
-		//Receive template T_U from server
+		//Receive template T_u from server
 		shared_ptr<Template_enc> T_enc = recv_template();
 
 		//Lookup vec_p in [[T_u]] and add up partial similarity scores
@@ -515,7 +515,7 @@ int Sensor::main_sh() {
 		//Send [[S]] to server
 		send_msg_enc(S_enc);
 
-		//Receive pair ([B], AES_k(1)) from server
+		//Receive pair ([B], aes_k_1(1)) from server
 		vector<shared_ptr<AsymmetricCiphertext>> B_enc2 = recv_vec_enc();
 		shared_ptr<SymmetricCiphertext> aes_k_1 = recv_aes_msg();
 
@@ -535,7 +535,7 @@ int Sensor::main_sh() {
 }
 
 /*
-*		Main function for malicious protocol
+*	Main function for malicious protocol
 */
 int Sensor::main_mal() {
 	try {
@@ -562,13 +562,27 @@ int Sensor::main_mal() {
 		//Set shared public key
 		key_setup(pk_sv);
 
-		//Create enrollment parameters and send to server
+		//Create enrollment parameters
 		int u_enroll = 1;
 		tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> enrollment = enroll(u_enroll, template_size, min_s, max_s);
-		send_msg(get<0>(enrollment)); //send u
-		send_template(get<1>(enrollment)); //send template T_u
-		send_msg_enc(get<2>(enrollment).first); //send [[k]]
-		send_aes_msg(get<2>(enrollment).second); //send AES_k(1)
+		shared_ptr<Template_enc> T_enc_enroll = get<1>(enrollment);
+		shared_ptr<AsymmetricCiphertext> k_enc_enroll = get<2>(enrollment).first;
+		shared_ptr<SymmetricCiphertext> aes_k_enroll = get<2>(enrollment).second;
+
+		//Create signature over m = (u, [[T_u]]) and n = (u, [[k]], aes_k_1(1))
+		shared_ptr<Signer> signer = make_shared<Signer>();
+		vector<byte> m_enroll = compute_m(u_enroll, T_enc_enroll);
+		vector<byte> n_enroll = compute_n(u_enroll, k_enc_enroll, aes_k_enroll);
+		Signature sig_m_enroll = signer->sign(m_enroll);
+		Signature sig_n_enroll = signer->sign(n_enroll);
+
+		//Send enrollment parameters m and n along with their signatures \sigma(m) and \sigma(n) to the server
+		send_msg(u_enroll); //send u
+		send_template(T_enc_enroll); //send template T_u
+		send_msg_enc(k_enc_enroll); //send [[k]]
+		send_aes_msg(aes_k_enroll); //send aes_k_1(1)
+		send_signature(sig_m_enroll); //send \sigma(m)
+		send_signature(sig_n_enroll); //send \sigma(n)
 
 		//Capture (u, vec(p))
 		pair<int, vector<int>> cap = capture(u_enroll, template_size);
@@ -578,8 +592,18 @@ int Sensor::main_mal() {
 		//Send u to server
 		send_msg(u);
 
-		//Receive template T_U from server
+		//Receive template T_u from server
 		shared_ptr<Template_enc> T_enc = recv_template();
+		shared_ptr<AsymmetricCiphertext> k_enc = recv_msg_enc();
+		shared_ptr<SymmetricCiphertext> aes_k_1 = recv_aes_msg();
+		Signature sig_m = recv_signature();
+		Signature sig_n = recv_signature();
+
+		//Verify [[T_u]] and key pair ([[k]], aes_k_1(1)) using \sigma(m) and \sigma(n), respectively
+		shared_ptr<Verifier> verifier = make_shared<Verifier>();
+		vector<byte> m = compute_m(u, T_enc);
+		vector<byte> n = compute_n(u, k_enc, aes_k_1); S
+			cout << "[[T_u]] verified: " << verifier->verify(m, sig_m, y); //send y;
 
 		//Lookup vec_p in [[T_u]] and add up partial similarity scores
 		vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc = look_up(vec_p, T_enc);
@@ -595,9 +619,8 @@ int Sensor::main_mal() {
 		//Verify permutation \pi([[C]] = [[C']]
 		cout << "permutation verified: " << verify_permutation(C_enc, C_enc_prime) << endl;
 
-		//Receive pair ([B], AES_k(1)) from server
+		//Receive pair [B] from server
 		vector<shared_ptr<AsymmetricCiphertext>> B_enc2 = recv_vec_enc();
-		shared_ptr<SymmetricCiphertext> aes_k_1 = recv_aes_msg();
 
 		//Fully decrypt [B] and check if it consists a valid key
 		vector<shared_ptr<GroupElement>> B = decrypt_B_enc2(B_enc2);
@@ -616,7 +639,7 @@ int Sensor::main_mal() {
 }
 
 /*
-*		General main function
+*	General main function
 */
 int main(int argc, char* argv[]) {
 	Sensor ss = Sensor("dlog_params.txt");

@@ -22,6 +22,7 @@
 
 #include "template.hpp"
 #include "math.hpp"
+#include "schnorrsig.hpp"
 
 class Party {
 protected:
@@ -50,6 +51,8 @@ public:
 
   void key_setup(shared_ptr<PublicKey> pk_other);
 
+  void send_msg(vector<byte> msg);
+
   void send_msg(string msg);
 
   void send_msg(int msg);
@@ -72,6 +75,8 @@ public:
 
   void send_template(shared_ptr<Template_enc> T_enc);
 
+  void send_signature(Signature sig);
+
   string recv_msg();
 
   biginteger recv_biginteger();
@@ -90,9 +95,15 @@ public:
 
   shared_ptr<Template_enc> recv_template();
 
+  Signature recv_signature();
+
   biginteger random_bit();
 
   biginteger random_bitstring(int bits);
+
+  vector<byte> compute_m(int u, shared_ptr<Template_enc> T_enc);
+
+  vector<byte> compute_n(int u, shared_ptr<AsymmetricCiphertext> k_enc, shared_ptr<SymmetricCiphertext> aes_k);
 
   int bct_p1();
 

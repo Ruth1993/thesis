@@ -1,5 +1,9 @@
 #include "../include/math.hpp"
 
+/*
+*	Compute a mod b
+*	Works if a is negative
+*/
 biginteger mod(biginteger a, biginteger b) {
 	biginteger result = a % b;
 
@@ -11,7 +15,7 @@ biginteger mod(biginteger a, biginteger b) {
 }
 
 /*
-*		Convert an integer to byte array
+*	Convert an integer to byte array
 */
 vector<unsigned char> int_to_byte(int a) {
 	vector<unsigned char> result(4);

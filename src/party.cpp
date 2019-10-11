@@ -46,10 +46,10 @@ void Party::send_msg(int msg) {
 }
 
 void Party::send_biginteger(biginteger msg) {
-	size_t length = bytesCount(msg);
-	byte output[length];
-	encodeBigInteger(msg, output, length);
-	channel->writeWithSize(output, length);
+	size_t size = bytesCount(msg);
+	byte msg_byte[size];
+	encodeBigInteger(msg, msg_byte, size);
+	channel->writeWithSize(msg_byte, size);
 }
 
 /*
@@ -88,7 +88,7 @@ void Party::send_aes_msg(shared_ptr<SymmetricCiphertext> c_m) {
 }
 
 /*
-*	Send group of bigintegers to other party
+*	Send vector of bigintegers to other party
 */
 void Party::send_vec_biginteger(vector<biginteger> vec_biginteger) {
 	//first send size of vector to the other party
@@ -138,19 +138,30 @@ void Party::send_template(shared_ptr<Template_enc> T_enc) {
 }
 
 /*
+*	Send signature to other party
+*/
+void Party::send_signature(Signature sig) {
+	send_biginteger(sig.s);
+	send_biginteger(sig.c);
+}
+
+/*
 *   Receive unencrypted message from other party
 */
 string Party::recv_msg() {
-  string msg;
+	string msg;
 
-  vector<byte> raw_msg;
-  channel->readWithSizeIntoVector(raw_msg);
-  const byte * uc = &(raw_msg[0]);
-  msg = string(reinterpret_cast<char const*>(uc), raw_msg.size());
+	vector<byte> raw_msg;
+	channel->readWithSizeIntoVector(raw_msg);
+	const byte * uc = &(raw_msg[0]);
+	msg = string(reinterpret_cast<char const*>(uc), raw_msg.size());
 
-  return msg;
+	return msg;
 }
 
+/*
+*	Receive biginteger from other party
+*/
 biginteger Party::recv_biginteger() {
 	vector<byte> raw_msg;
 	channel->readWithSizeIntoVector(raw_msg);
@@ -294,6 +305,17 @@ shared_ptr<Template_enc> Party::recv_template() {
   return make_shared<Template_enc>(T_enc);
 }
 
+/*
+*	Receive signature from other party
+*/
+Signature Party::recv_signature() {
+	biginteger s = recv_biginteger();
+	biginteger c = recv_biginteger();
+
+	Signature sig = { s,c };
+	return sig;
+}
+
 biginteger Party::random_bit() {
 	return getRandomInRange(0, 1, get_seeded_prg().get());
 }
@@ -310,6 +332,47 @@ biginteger Party::random_bitstring(int bits) {
 	}
 
 	return result;
+}
+
+/*
+*	Compute m = (u, [[T_u]])
+*/
+vector<byte> Party::compute_m(int u, shared_ptr<Template_enc> T_enc) {
+	vector<byte> m(int_to_byte(u));
+
+	pair<int, int> size = T_enc->size();
+
+	for (int i = 0; i < size.first; i++) {
+		for (int j = 0; j < size.second; j++) {
+			vector<byte> c1 = dlog->decodeGroupElementToByteArray(((ElGamalOnGroupElementCiphertext*)T_enc->get_elem(i, j).get())->getC1().get());
+			vector<byte> c2 = dlog->decodeGroupElementToByteArray(((ElGamalOnGroupElementCiphertext*)T_enc->get_elem(i, j).get())->getC2().get());
+
+			m.insert(m.end(), c1.begin(), c1.end());
+			m.insert(m.end(), c2.begin(), c2.end());
+		}
+	}
+
+	return m;
+}
+
+/*
+*	Compute n = (u, [[k]], AES_k(1))
+*/
+vector<byte> Party::compute_n(int u, shared_ptr<AsymmetricCiphertext> k_enc, shared_ptr<SymmetricCiphertext> aes_k) {
+	vector<byte> n(int_to_byte(u));
+
+	vector<byte> c1 = dlog->decodeGroupElementToByteArray(((ElGamalOnGroupElementCiphertext*)k_enc.get())->getC1().get());
+	vector<byte> c2 = dlog->decodeGroupElementToByteArray(((ElGamalOnGroupElementCiphertext*)k_enc.get())->getC2().get());
+
+	n.insert(n.end(), c1.begin(), c1.end());
+	n.insert(n.end(), c2.begin(), c2.end());
+
+	string aes_k_string = aes_k->toString();
+	vector<byte> aes_k_byte(aes_k_string.begin(), aes_k_string.end());
+
+	n.insert(n.end(), aes_k_byte.begin(), aes_k_byte.end());
+
+	return n;
 }
 
 /*
