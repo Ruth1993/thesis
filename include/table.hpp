@@ -36,9 +36,9 @@ public:
 
   pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> get_key_pair(int u);
 
-  pair<Signature, shared_ptr<GroupElement>> get_sig_m(int u);
+  Signature get_sig_m(int u);
 
-  pair<Signature, shared_ptr<GroupElement>> get_sig_n(int u);
+  Signature get_sig_n(int u);
 
   shared_ptr<GroupElement> get_y(int u);
 

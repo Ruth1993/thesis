@@ -26,12 +26,18 @@ Server::Server(string config_file_path) {
 	elgamal = make_shared<ElGamalOnGroupElementEnc>(dlog);
 
 	//Generate and set ElGamal keypair
+	auto start = std::chrono::high_resolution_clock::now();
+
 	auto pair = elgamal->generateKey();
 
 	pk_own = pair.first;
 	sk_own = pair.second;
 
 	elgamal->setKey(pk_own, sk_own);
+
+	auto end = std::chrono::high_resolution_clock::now();
+
+	cout << "ElGamal setup: " << chrono::duration_cast<chrono::microseconds>(end - start).count() << endl;
 }
 
 /*
@@ -547,6 +553,8 @@ int Server::main_mal() {
 		channel->join(500, 5000);
 		cout << "channel established" << endl;
 
+		auto start_setup = std::chrono::high_resolution_clock::now();
+
 		//First send public key
 		send_pk();
 
@@ -556,7 +564,11 @@ int Server::main_mal() {
 		//Set shared public keys
 		key_setup(pk_ss);
 
+		auto end_setup = std::chrono::high_resolution_clock::now();
+
 		//Receive enrollment parameters m and n and signatures \sigma(m) and \sigma(n) from sensor
+		auto start_comm1 = std::chrono::high_resolution_clock::now();
+
 		int u_enroll = stoi(recv_msg()); //receive u
 		cout << "received enrollment from user u: " << u_enroll << endl;
 		shared_ptr<Template_enc> T_enc_enroll = recv_template(); //receive [[T_u]]
@@ -564,55 +576,116 @@ int Server::main_mal() {
 		shared_ptr<SymmetricCiphertext> aes_k_1_enroll = recv_aes_msg(); //receive AES_k(1)
 		Signature sig_m_enroll = recv_signature(); //receive \sigma(m)
 		Signature sig_n_enroll = recv_signature(); //receive \sigma(n)
+		shared_ptr<GroupElement> y_enroll = recv_group_element(); //receive public key y
+
+		auto end_comm1 = std::chrono::high_resolution_clock::now();
 
 		//Store enrollment in table
-		store_table(u_enroll, T_enc_enroll, k_enc_enroll, aes_k_1_enroll, sig_m_enroll, sig_n_enroll);
+		auto start_store = std::chrono::high_resolution_clock::now();
+
+		store_table(u_enroll, T_enc_enroll, k_enc_enroll, aes_k_1_enroll, sig_m_enroll, sig_n_enroll, y_enroll);
+
+		auto end_store = std::chrono::high_resolution_clock::now();
 
 		//Receive identity claim u from sensor
+		auto start_comm2 = std::chrono::high_resolution_clock::now();
+
 		int u = stoi(recv_msg());
 		cout << "received identity claim u: " << u << endl;
 
-		//Fetch T_u, [[k]], AES_k(1), sig(m) and sig(n) from table
+		auto end_comm2 = std::chrono::high_resolution_clock::now();
+
+		//Fetch T_u, [[k]], AES_k(1), sig(m), sig(n) and y from table
+		auto start_fetch = std::chrono::high_resolution_clock::now();
+
 		shared_ptr<Template_enc> T_enc = fetch_template(u);
 		pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> key_pair = fetch_key_pair(u);
 		Signature sig_m = fetch_sig_m(u);
 		Signature sig_n = fetch_sig_n(u);
+		shared_ptr<GroupElement> y = fetch_y(u);
+
+		auto end_fetch = std::chrono::high_resolution_clock::now();
 
 		//Send T_u, [[k]], AES_k(1), sig(m) and sig(n) to sensor
+		auto start_comm3 = std::chrono::high_resolution_clock::now();
+
 		send_template(T_enc);
 		send_msg_enc(key_pair.first);
 		send_aes_msg(key_pair.second);
 		send_signature(sig_m);
 		send_signature(sig_n);
+		send_group_element(y);
 
 		//Receive [[S]] from sensor
 		shared_ptr<AsymmetricCiphertext> S_enc = recv_msg_enc();
 
+		auto end_comm3 = std::chrono::high_resolution_clock::now();
+
 		//Compare [[S]] with t
+		auto start_compare = std::chrono::high_resolution_clock::now();
+
 		vector<shared_ptr<AsymmetricCiphertext>> C_enc = compare(S_enc, t, max_S);
 
+		auto end_compare = std::chrono::high_resolution_clock::now();
+
 		//Permute [[C]] to get [[C']
+		auto start_permute = std::chrono::high_resolution_clock::now();
+
 		tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>, vector<vector<int>>> permutation = permute(C_enc);
+
+		auto end_permute = std::chrono::high_resolution_clock::now();
 
 		vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime = get<0>(permutation);
 		vector<biginteger> r = get<1>(permutation);
 		vector<vector<int>> A = get<2>(permutation);
 
 		//Send [[C]] and [[C']] to sensor
+		auto start_comm4 = std::chrono::high_resolution_clock::now();
+
 		send_vec_enc(C_enc);
 		send_vec_enc(C_enc_prime);
 
+		auto end_comm4 = std::chrono::high_resolution_clock::now();
+
 		//Prove permutation function \pi([[C]] = [[C']]
+		auto start_prove_permute = std::chrono::high_resolution_clock::now();
+
 		prove_permutation(C_enc, C_enc_prime, r, A);
 
+		auto end_prove_permute = std::chrono::high_resolution_clock::now();
+
 		//Multiply elements in [[C]] with [[k]]
+		auto start_B = std::chrono::high_resolution_clock::now();
+
 		vector<shared_ptr<AsymmetricCiphertext>> B_enc = calc_B_enc(C_enc_prime, key_pair.first);
 
+		auto end_B = std::chrono::high_resolution_clock::now();
+
 		//Perform partial decryption function D1
+		auto start_dec = std::chrono::high_resolution_clock::now();
+
 		vector<shared_ptr<AsymmetricCiphertext>> B_enc2 = D1(B_enc);
 
+		auto end_dec = std::chrono::high_resolution_clock::now();
+
 		//Send [B] to sensor
+		auto start_comm5 = std::chrono::high_resolution_clock::now();
+
 		send_vec_enc(B_enc2);
+
+		auto end_comm5 = std::chrono::high_resolution_clock::now();
+
+		cout << endl;
+		cout << "Elapsed time in us: " << endl;
+		cout << "Shared key setup: " << chrono::duration_cast<chrono::microseconds>(end_setup - start_setup).count() << endl;
+		cout << "Store in table: " << chrono::duration_cast<chrono::microseconds>(end_store - start_store).count() << endl;
+		cout << "Fetch from table: " << chrono::duration_cast<chrono::microseconds>(end_fetch - start_fetch).count() << endl;
+		cout << "Comparison: " << chrono::duration_cast<chrono::microseconds>(end_compare - start_compare).count() << endl;
+		cout << "Permutation: " << chrono::duration_cast<chrono::microseconds>(end_permute - start_permute).count() << endl;
+		cout << "Prove permutation: " << chrono::duration_cast<chrono::microseconds>(end_prove_permute - start_prove_permute).count() << endl;
+		cout << "[[C]]*[[k]]: " << chrono::duration_cast<chrono::microseconds>(end_B - start_B).count() << endl;
+		cout << "Partial decryption: " << chrono::duration_cast<chrono::microseconds>(end_dec - start_dec).count() << endl;
+		cout << "Total communication overhead: " << chrono::duration_cast<chrono::microseconds>(end_comm1 - start_comm1 + end_comm2 - start_comm2 + end_comm3 - start_comm3 + end_comm4 - start_comm4 + end_comm5 - start_comm5).count() << endl;
 
 		io_service.stop();
 		th.join();
@@ -625,7 +698,7 @@ int Server::main_mal() {
 }
 
 int main(int argc, char* argv[]) {
-	Server sv = Server("dlog_params.txt");
+	Server sv = Server("dlog_params2.txt");
 
 	if(argc == 1) {
 		return sv.main_sh();
