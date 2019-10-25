@@ -3,7 +3,7 @@ This is the code for my master thesis. It's still work in progress, so when you 
 
 Install instructions:
 - git clone https://github.com/Ruth1993/thesis.git
-- Install libscapi as on: https://github.com/cryptobiu/libscapi/blob/master/build_scripts/INSTALL.md.
+- Install libscapi as on: https://github.com/cryptobiu/libscapi/tree/dev. If it does not compile, please try https://github.com/Ruth1993/libscapi
 - To check if the installation was successful, build and run the tests as on: https://biulibscapi.readthedocs.io/en/latest/install.html
 
 For the installation of the malicious key release protocol, please carry out the additional steps:
