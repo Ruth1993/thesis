@@ -12,6 +12,7 @@
 #include "../../libscapi/include/interactive_mid_protocols/ZeroKnowledge.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolPedersenCommittedValue.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolPedersenCmtKnowledge.hpp"
+#include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolAnd.hpp"
 
 #include <boost/thread/thread.hpp>
 
@@ -53,22 +54,19 @@ int main(int argc, char* argv[]) {
     shared_ptr<CommParty> channel = make_shared<CommPartyTCPSynced>(io_service, p1, p2);
 
     //setup ElGamal communication
-		//First read Dlog parameters from file dlog_params.txt
-		ConfigFile cf("dlog_params.txt");
-		string p_string = cf.Value("", "p");
-		string g_string = cf.Value("", "g");
-		string q_string = cf.Value("", "q");
+	//First read Dlog parameters from file dlog_params.txt
+	/*ConfigFile cf("dlog_params.txt");
+	string p_string = cf.Value("", "p");
+	string g_string = cf.Value("", "g");
+	string q_string = cf.Value("", "q");
     auto dlog = make_shared<OpenSSLDlogZpSafePrime>(q_string, g_string, p_string);
-		auto g = dlog->getGenerator();
+	auto g = dlog->getGenerator();
     ElGamalOnGroupElementEnc elgamal(dlog);
     auto pair = elgamal.generateKey();
     elgamal.setKey(pair.first, pair.second);
 
-		shared_ptr<GroupElement> h = ((ElGamalPublicKey*) pair.first.get())->getH();
-		cout << "h: " << ((OpenSSLZpSafePrimeElement *)h.get())->getElementValue() << endl;
-
-		shared_ptr<GroupParams> group_params = dlog->getGroupParams();
-		cout << ((ZpGroupParams*) group_params.get())->toString() << endl;
+	shared_ptr<GroupElement> h = ((ElGamalPublicKey*) pair.first.get())->getH();
+	cout << "h: " << ((OpenSSLZpSafePrimeElement *)h.get())->getElementValue() << endl;*/
 
     try {
       channel->join(500, 5000);
@@ -107,13 +105,45 @@ int main(int argc, char* argv[]) {
 			}*/
 
 			//Zero-knowledge proof stuff
-			/*auto dlog2 = make_shared<OpenSSLDlogECF2m>("K-233");
+			//
+				/*auto dlog = make_shared<OpenSSLDlogECF2m>("K-233");
+				auto g = dlog->getGenerator();
 			ZKFromSigmaProver prover(channel, make_shared<SigmaDlogProverComputation>(dlog, 40));
+			  biginteger q = dlog->getOrder();
+			  biginteger r = 3;
+			  auto co = dlog->exponentiate(g.get(), r);
+			  cout << "co: " << ((OpenSSLZpSafePrimeElement*)co.get())->getElementValue() << endl;
+			  shared_ptr<SigmaDlogProverInput> input = make_shared<SigmaDlogProverInput>(co, r);
+			  prover.prove(input);*/
+
+			auto dlog = make_shared<OpenSSLDlogECF2m>("K-233");
+			auto g = dlog->getGenerator();
+			vector<shared_ptr<SigmaProverComputation>> provers;
+
+			for (int i = 0; i < 2; i++) {
+				provers.push_back(make_shared<SigmaDlogProverComputation>(dlog, 40));
+			}
+
+			ZKFromSigmaProver prover(channel, make_shared<SigmaANDProverComputation>(provers, 40));
 			biginteger q = dlog->getOrder();
-			biginteger r = getRandomInRange(0, q-1, get_seeded_prg().get());
-			auto co = dlog->exponentiate(g.get(), r);
-			shared_ptr<SigmaDlogProverInput> input = make_shared<SigmaDlogProverInput>(co, r);
-			prover.prove(input);*/
+			biginteger r = 5;
+			biginteger r2 = 85;
+			auto co1 = dlog->exponentiate(g.get(), r);
+			auto h = dlog->exponentiate(g.get(), 17);
+			auto co2 = dlog->exponentiate(h.get(), r);
+			auto co3 = dlog->exponentiate(g.get(), r2);
+
+			cout << "g^r: " << ((OpenSSLZpSafePrimeElement*)co1.get())->getElementValue() << endl;
+			cout << "h^r: " << ((OpenSSLZpSafePrimeElement*)co2.get())->getElementValue() << endl;
+			cout << "g^85: " << ((OpenSSLZpSafePrimeElement*)co3.get())->getElementValue() << endl;
+
+			vector<shared_ptr<SigmaProverInput>> inputs;
+
+			inputs.push_back(make_shared<SigmaDlogProverInput>(co1, r));
+			inputs.push_back(make_shared<SigmaDlogProverInput>(co2, r));
+
+			shared_ptr<SigmaMultipleProverInput> input = make_shared<SigmaMultipleProverInput>(inputs);
+			prover.prove(input);
 
 			//Fiat Shamir stuff
 			/*shared_ptr<SigmaPedersenCmtKnowledgeProverComputation> proverComputation = make_shared<SigmaPedersenCmtKnowledgeProverComputation>(dlog, 40, get_seeded_prg());
@@ -164,7 +194,7 @@ int main(int argc, char* argv[]) {
 			prover.prove(input);*/
 
 			//Pedersen commitment with proof
-		  CmtPedersenWithProofsCommitter committer(channel, 40, dlog);
+		  /*CmtPedersenWithProofsCommitter committer(channel, 40, dlog);
 		  shared_ptr<CmtCommitValue> com = committer.sampleRandomCommitValue();
 		  cout << "the committed value is:" << com->toString() << endl;
 		  long id = 0;
@@ -176,7 +206,7 @@ int main(int argc, char* argv[]) {
 		  biginteger a = 13;
 		  biginteger b = 34;
 		  biginteger c = a ^ b;
-		  cout << "a xor b: " << c << endl;
+		  cout << "a xor b: " << c << endl;*/
     } catch (const logic_error& e) {
     		// Log error message in the exception object
     		cerr << e.what();

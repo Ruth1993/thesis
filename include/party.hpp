@@ -30,8 +30,10 @@ protected:
   shared_ptr<CommParty> channel;
 
   //ElGamal and AES objects
-  shared_ptr<OpenSSLCTREncRandomIV> aes_enc;
-  shared_ptr<OpenSSLDlogZpSafePrime> dlog;
+  shared_ptr<OpenSSLCTREncRandomIV> aes;
+  //shared_ptr<OpenSSLDlogZpSafePrime> dlog;
+  shared_ptr<OpenSSLDlogECF2m> dlog;
+  //shared_ptr<OpenSSLDlogECFp> dlog;
   shared_ptr<ElGamalOnGroupElementEnc> elgamal;
 
   shared_ptr<PublicKey> pk_own;
@@ -43,6 +45,7 @@ protected:
   const int min_s = 0;
   const int max_s = 10;
   const biginteger max_S = template_size.first * max_s;
+  const biginteger t = max_S / 5 * 4; //threshold
 
 public:
   void pad(vector<unsigned char> &input, int bytes);
@@ -50,8 +53,6 @@ public:
   shared_ptr<PublicKey> recv_pk();
 
   void key_setup(shared_ptr<PublicKey> pk_other);
-
-  void send_msg(vector<byte> msg);
 
   void send_msg(string msg);
 
@@ -104,6 +105,8 @@ public:
   vector<byte> compute_m(int u, shared_ptr<Template_enc> T_enc);
 
   vector<byte> compute_n(int u, shared_ptr<AsymmetricCiphertext> k_enc, shared_ptr<SymmetricCiphertext> aes_k);
+
+  vector<shared_ptr<AsymmetricCiphertext>> calc_B_enc(vector<shared_ptr<AsymmetricCiphertext>> C_enc2, shared_ptr<AsymmetricCiphertext> K_enc2);
 
   int bct_p1();
 

@@ -15,15 +15,12 @@
 
 using namespace std;
 
-Sensor::Sensor(string config_file_path) {
+Sensor::Sensor() {
 	//Initialize encryption objects
-	aes_enc = make_shared<OpenSSLCTREncRandomIV>("AES");
+	aes = make_shared<OpenSSLCTREncRandomIV>("AES");
 
-	ConfigFile cf(config_file_path);
-	string p = cf.Value("", "p");
-	string g = cf.Value("", "g");
-	string q = cf.Value("", "q");
-	dlog = make_shared<OpenSSLDlogZpSafePrime>(q, g, p);
+	dlog = make_shared<OpenSSLDlogECF2m>("../../libscapi/include/configFiles/NISTEC.txt", "K-233");
+	//dlog = make_shared<OpenSSLDlogECFp>("B-163");
 	elgamal = make_shared<ElGamalOnGroupElementEnc>(dlog);
 
 	//Generate ElGamal keypair
@@ -41,7 +38,7 @@ Sensor::Sensor(string config_file_path) {
 }
 
 /*
-*		Captures vec_p with identity claim u
+*	Captures vec_p with identity claim u
 */
 pair<int, vector<int>> Sensor::capture(int u, pair<int, int> template_size) {
 	vector<int> vec_p;
@@ -64,7 +61,7 @@ pair<int, vector<int>> Sensor::capture(int u, pair<int, int> template_size) {
 }
 
 /*
-*		Captures vec_p with random identity claim u
+*	Captures vec_p with random identity claim u
 */
 pair<int, vector<int>> Sensor::capture(pair<int, int> template_size) {
 	unsigned seed = chrono::system_clock::now().time_since_epoch().count();
@@ -76,7 +73,7 @@ pair<int, vector<int>> Sensor::capture(pair<int, int> template_size) {
 }
 
 /*
-*		Encrypt template using ElGamal
+*	Encrypt template using ElGamal
 */
 shared_ptr<Template_enc> Sensor::encrypt_template(Template T) {
 	Template_enc T_enc;
@@ -121,7 +118,7 @@ shared_ptr<Template> Sensor::decrypt_template(shared_ptr<Template_enc> T_enc) {
 }
 
 /*
-*		Enrollment procedure (Steps 1-6)
+*	Enrollment procedure (Steps 1-6)
 */
 tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>>> Sensor::enroll(int u, pair<int, int> template_size, int min_s, int max_s) {
 	auto g = dlog->getGenerator();
@@ -150,32 +147,45 @@ tuple<int, shared_ptr<Template_enc>, pair<shared_ptr<AsymmetricCiphertext>, shar
 
 	//Step 6: aes_k_1(1)
 	//First copy g_k to byte vector in order to use in AES encryption
-	vector<unsigned char> g_k_vec = dlog->decodeGroupElementToByteArray(g_k.get());
-	//byte g_k_byte[128 / 8];
-	//encodeBigInteger()
+	vector<byte> g_k_vec = dlog->decodeGroupElementToByteArray(g_k.get());
+
+	//then hash K
+	shared_ptr<CryptographicHash> H = make_shared<OpenSSLSHA256>();
+	H->update(g_k_vec, 0, g_k_vec.size());
+	vector<byte> g_k_hash;
+	H->hashFinal(g_k_hash, 0);
 
 	//Pad byte vector of g^k (mod 2^129-1) to get byte vector of 128 bits
-	pad(g_k_vec, 128);
+	//pad(g_k_hash, 128);
+
+	//vector<byte> g_k_hash;
+
+	//gen_random_bytes_vector(g_k_hash, 16, get_seeded_prg().get());
 
 	//byte arr_k[15];
 	//copy_byte_vector_to_byte_array(vec_k, &arr_k, 0);
 	//print_byte_array(arr_k, vec_k.size(), "");
-	SecretKey aes_k_sk = SecretKey(g_k_vec, "");
+	SecretKey aes_k_sk = SecretKey(g_k_hash, "");
 
-	aes_enc->setKey(aes_k_sk);
+	aes->setKey(aes_k_sk);
 
 	vector<unsigned char> vec = int_to_byte(1);
 	ByteArrayPlaintext p1(vec);
 
-	shared_ptr<SymmetricCiphertext> aes_k_1 = aes_enc->encrypt(&p1);
+	shared_ptr<SymmetricCiphertext> aes_k_1 = aes->encrypt(&p1);
+	/*shared_ptr<Plaintext> decryption = aes->decrypt(aes_k_1.get());
+	biginteger decryption_int = byte_to_int(((ByteArrayPlaintext*)decryption.get())->getText());
+
+	cout << "decryption_int: " << decryption_int << endl;*/
+
 
 	return make_tuple(u, T_enc, make_pair(k_enc, aes_k_1));
 }
 
 /*
-*		Look up similarity scores in T_u by selecting the corresponding rows using vec_p
-*		assert vec_p.size() == T_enc.T_enc.size()
-*		assert \forall p in vec_p: 0 <= p < col
+*	Look up similarity scores in T_u by selecting the corresponding rows using vec_p
+*	assert vec_p.size() == T_enc.T_enc.size()
+*	assert \forall p in vec_p: 0 <= p < col
 */
 vector<shared_ptr<AsymmetricCiphertext>> Sensor::look_up(vector<int> vec_p, shared_ptr<Template_enc> T_enc) {
 	vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc;
@@ -190,7 +200,7 @@ vector<shared_ptr<AsymmetricCiphertext>> Sensor::look_up(vector<int> vec_p, shar
 }
 
 /*
-*		Add up all scores contained in [[vec_s]]
+*	Add up all scores contained in [[vec_s]]
 */
 shared_ptr<AsymmetricCiphertext> Sensor::add_scores(vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc) {
 	//first add 0 (g^0) for randomization
@@ -206,6 +216,126 @@ shared_ptr<AsymmetricCiphertext> Sensor::add_scores(vector<shared_ptr<Asymmetric
 	}
 
 	return result;
+}
+
+bool Sensor::verify_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime) {
+	auto g = dlog->getGenerator();
+	//cout << "g: " << ((OpenSSLZpSafePrimeElement*)g.get())->getElementValue() << endl;
+	biginteger q = dlog->getOrder();
+	//cout << "q: " << q << endl;
+	auto gen = get_seeded_prg();
+
+	int k = C_enc_prime.size();
+	int k5 = k + 5;
+
+	//cout << "before loop f_u" << endl;
+
+	//Generate F_k \in_R Z_q for k=-4,...,k
+	vector<shared_ptr<GroupElement>> f(k+5, 0);
+	for (int micro = 0; micro < k5; micro++) {
+		f[micro] = dlog->createRandomElement();
+	}
+
+	//Send F_k to prover
+	send_vec_group_element(f);
+
+	//cout << "before receive commitment" << endl;
+
+	//Receive commitment from prover
+	auto g_0_prime = recv_group_element();
+	auto m_0_prime = recv_group_element();
+	auto f_tilde_0_prime = recv_group_element();
+	vector<shared_ptr<GroupElement>> f_prime = recv_vec_group_element();
+	biginteger w = recv_biginteger();
+	biginteger w_dot = recv_biginteger();
+
+	//cout << "before challenge" << endl;
+
+	//Pick random challenge c_i \in Z_q for i=1,...,k
+	vector<biginteger> c(k+1, 0);
+	c[0] = 1;
+
+	for (int i = 1; i < k+1; i++) {
+		c[i] = getRandomInRange(10, 20, gen.get());
+	}
+
+	//Send challenge to the prover
+	send_vec_biginteger(c);
+
+	//cout << "before receive response" << endl;
+
+	//Receive response from prover
+	vector<biginteger> r = recv_vec_biginteger();
+	vector<biginteger> r_prime = recv_vec_biginteger();
+
+	//cout << "before verify 9" << endl;
+
+	//Verify following statements (in paper Furukawa statements 9-13)
+	biginteger alpha = getRandomInRange(0, q - 1, gen.get());
+
+	auto left9 = dlog->getIdentity();
+	auto right9 = dlog->multiplyGroupElements(f_prime[0].get(), dlog->exponentiate(f_tilde_0_prime.get(), alpha).get());
+
+	//cout << "before loop 9" << endl;
+
+	for (int v = 0; v < k+5; v++) {
+		left9 = dlog->multiplyGroupElements(left9.get(), dlog->exponentiate(f[v].get(), mod(r[v]+alpha*r_prime[v], q)).get());
+	}
+
+	//cout << "before right9" << endl;
+
+	for (int i = 0; i < k; i++) {
+		right9 = dlog->multiplyGroupElements(right9.get(), dlog->exponentiate(f_prime[i + 1].get(), mod(c[i + 1] + alpha * c[i + 1] * c[i + 1], q)).get());
+	}
+
+	//cout << "before verify 10 and 11" << endl;
+
+	auto left10 = dlog->exponentiate(g.get(), r[0+4]);
+	auto right10 = dlog->exponentiate(g_0_prime.get(), c[0]);
+
+	auto left11 = dlog->exponentiate(g.get(), r[0+4]);
+	auto right11 = dlog->exponentiate(m_0_prime.get(), c[0]);
+
+	for (int v = 0; v < k; v++) {
+		auto g_v = ((ElGamalOnGroupElementCiphertext*)C_enc[v].get())->getC1();
+		auto m_v = ((ElGamalOnGroupElementCiphertext*)C_enc[v].get())->getC2();
+
+		auto g_micro_prime = ((ElGamalOnGroupElementCiphertext*)C_enc_prime[v].get())->getC1();
+		auto m_micro_prime = ((ElGamalOnGroupElementCiphertext*)C_enc_prime[v].get())->getC2();
+
+		cout << "r[" << (v+5) << "]: " << r[v + 5] << endl << endl;
+		cout << "c[" << (v + 1) << "]: " << c[v + 1] << endl << endl;
+
+		auto left10_test = dlog->exponentiate(g_v.get(), r[v + 5]);
+		auto right10_test = dlog->exponentiate(g_micro_prime.get(), c[v + 1]);
+		left10 = dlog->multiplyGroupElements(left10.get(), left10_test.get());
+		right10 = dlog->multiplyGroupElements(right10.get(), right10_test.get());
+
+		cout << "left10[" << v << "]:" << ((OpenSSLZpSafePrimeElement*)left10_test.get())->getElementValue() << endl;
+		cout << "right10[" << v << "]:" << ((OpenSSLZpSafePrimeElement*)right10_test.get())->getElementValue() << endl;
+
+		left11 = dlog->multiplyGroupElements(left11.get(), dlog->exponentiate(m_v.get(), r[v+5]).get());
+		right11 = dlog->multiplyGroupElements(right11.get(), dlog->exponentiate(m_micro_prime.get(), c[v+1]).get());
+	}
+
+	//cout << "before verify 12 and 13" << endl;
+
+	biginteger left12;
+	biginteger right12 = mod(r[-2 + 4] + r_prime[-3+4]+w, q);
+
+	biginteger left13;
+	biginteger right13 = mod(r[-4 + 4] + w_dot, q);
+
+	for (int j = 0; j < k; j++) {
+		left12 += mod(r[j+5] * r[j+5] * r[j+5] - c[j+1]*c[j+1]*c[j+1], q);
+		left13 += mod(r[j+5] * r[j+5] - c[j+1] * c[j+1], q);
+	}
+
+	cout << "left13: " << left13 << endl;
+	cout << "right13: " << right13 << endl;
+
+	return (*left10.get() == *right10.get());
+	//return (*left9.get() == *right9.get()) && (*left10.get() == *right10.get()) && (*left11.get() == *right11.get()) && (left12 == right12) && (left13 == right13);
 }
 
 /*
@@ -300,7 +430,7 @@ bool Sensor::verify_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, 
 }
 
 /*
-*		Decrypt all the values in [B]
+*	Decrypt all the values in [B]
 */
 vector<shared_ptr<GroupElement>> Sensor::decrypt_B_enc2(vector<shared_ptr<AsymmetricCiphertext>> B_enc2) {
 	vector<shared_ptr<GroupElement>> B;
@@ -316,21 +446,27 @@ vector<shared_ptr<GroupElement>> Sensor::decrypt_B_enc2(vector<shared_ptr<Asymme
 }
 
 /*
-*		For every value in B, check if AES_{B_i} == 1. In case there is such a value, B_i is the key that is released by the system and can be used by the sensor device for further applications
+*	For every value in B, check if AES_{B_i} == 1. In case there is such a value, B_i is the key that is released by the system and can be used by the sensor device for further applications
 */
 shared_ptr<GroupElement> Sensor::check_key(vector<shared_ptr<GroupElement>> B, shared_ptr<SymmetricCiphertext> aes_k_1) {
+	shared_ptr<CryptographicHash> H = make_shared<OpenSSLSHA256>();
 	auto g = dlog->getGenerator();
 
 	auto result = dlog->exponentiate(g.get(), 0); //initiate result with g^0 = 1
 
 	for(int i=0; i<B.size(); i++) {
 		vector<unsigned char> B_i_bytes = dlog->decodeGroupElementToByteArray(B[i].get());
-		pad(B_i_bytes, 128);
 
-		SecretKey aes_B_i_sk = SecretKey(B_i_bytes, "");
-		aes_enc->setKey(aes_B_i_sk);
+		//pad(B_i_bytes, 128);
 
-		shared_ptr<Plaintext> decryption = aes_enc->decrypt(aes_k_1.get());
+		H->update(B_i_bytes, 0, B_i_bytes.size());
+		vector<byte> B_i_hash;
+		H->hashFinal(B_i_hash, 0);
+
+		SecretKey aes_B_i_sk = SecretKey(B_i_hash, "");
+		aes->setKey(aes_B_i_sk);
+
+		shared_ptr<Plaintext> decryption = aes->decrypt(aes_k_1.get());
 		biginteger decryption_int = byte_to_int(((ByteArrayPlaintext *)decryption.get())->getText());
 
 		//cout << "B_" << i << ": " << ((OpenSSLZpSafePrimeElement *)B[i].get())->getElementValue() << endl;
@@ -345,7 +481,7 @@ shared_ptr<GroupElement> Sensor::check_key(vector<shared_ptr<GroupElement>> B, s
 }
 
 /*
-*		Test function lookup
+*	Test function lookup
 */
 void Sensor::test_look_up() {
 	auto g = dlog->getGenerator();
@@ -448,7 +584,7 @@ vector<shared_ptr<AsymmetricCiphertext>> Sensor::encrypt_scores(int nr) {
 }
 
 /*
-*		Print outcomes of g^i for 0 <= total < 30
+*	Print outcomes of g^i for 0 <= total < 30
 */
 void Sensor::print_outcomes(int total) {
 	auto g = dlog->getGenerator();
@@ -610,6 +746,8 @@ int Sensor::main_mal() {
 		send_signature(sig_n_enroll); //send \sigma(n)
 		send_group_element(signer->y); //send public key y
 
+		cout << "y: " << ((OpenSSLZpSafePrimeElement*)signer->y.get())->getElementValue() << endl;
+
 		auto end_comm1 = std::chrono::high_resolution_clock::now();
 
 		//Capture (u, vec(p))
@@ -662,25 +800,43 @@ int Sensor::main_mal() {
 
 		send_msg_enc(S_enc);
 
+		auto end_comm3 = std::chrono::high_resolution_clock::now();
+
+		cout << "----[[S]]---->" << endl;
+
 		//Receive [[C]] and [[C']] from server
+		auto start_comm4 = std::chrono::high_resolution_clock::now();
+
 		vector<shared_ptr<AsymmetricCiphertext>> C_enc = recv_vec_enc();
 		vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime = recv_vec_enc();
 
-		auto end_comm3 = std::chrono::high_resolution_clock::now();
+		cout << "<----([[C]], [[C']])---" << endl;
+
+		auto end_comm4 = std::chrono::high_resolution_clock::now();
 
 		//Verify permutation \pi([[C]] = [[C']]
 		auto start_ver_permute = std::chrono::high_resolution_clock::now();
 
-		cout << "permutation verified: " << verify_permutation(C_enc, C_enc_prime) << endl;
+		cout << "permutation verified: " << verify_permutation2(C_enc, C_enc_prime) << endl;
 
 		auto end_ver_permute = std::chrono::high_resolution_clock::now();
 
-		//Receive pair [B] from server
-		auto start_comm4 = std::chrono::high_resolution_clock::now();
+		//Also compute [[B]] = [[C']] + [[k]] to check server's computation of [[B]]
+		auto start_B = std::chrono::high_resolution_clock::now();
+
+		vector<shared_ptr<AsymmetricCiphertext>> B_enc = calc_B_enc(C_enc_prime, k_enc);
+
+		auto end_B = std::chrono::high_resolution_clock::now();
+
+		//Receive [B] from server
+		auto start_comm5 = std::chrono::high_resolution_clock::now();
 
 		vector<shared_ptr<AsymmetricCiphertext>> B_enc2 = recv_vec_enc();
 
-		auto end_comm4 = std::chrono::high_resolution_clock::now();
+		auto end_comm5 = std::chrono::high_resolution_clock::now();
+
+		//Engage in ZK-proof with server to check that [B] is a correct decryption of [[B]] under sk_sk
+		//TODO don't forget to include the [[B]] that we computed previously here
 
 		//Fully decrypt [B]
 		auto start_dec = std::chrono::high_resolution_clock::now();
@@ -698,19 +854,35 @@ int Sensor::main_mal() {
 
 		cout << "Key: " << ((OpenSSLZpSafePrimeElement*)key.get())->getElementValue() << endl;
 
+		//Print elapsed time
+		auto time_setup = chrono::duration_cast<chrono::microseconds>(end_setup - start_setup).count();
+		auto time_enroll = chrono::duration_cast<chrono::microseconds>(end_enroll - start_enroll).count();
+		auto time_sig = chrono::duration_cast<chrono::microseconds>(end_sig - start_sig).count();
+		auto time_capture = chrono::duration_cast<chrono::microseconds>(end_capture - start_capture).count();
+		auto time_ver_sig = chrono::duration_cast<chrono::microseconds>(end_ver_sig - start_ver_sig).count();
+		auto time_lookup = chrono::duration_cast<chrono::microseconds>(end_lookup - start_lookup).count();
+		auto time_ver_permute = chrono::duration_cast<chrono::microseconds>(end_ver_permute - start_ver_permute).count();
+		auto time_dec = chrono::duration_cast<chrono::microseconds>(end_dec - start_dec).count();
+		auto time_check = chrono::duration_cast<chrono::microseconds>(end_check - start_check).count();
+		auto time_comm = chrono::duration_cast<chrono::microseconds>(end_comm1 - start_comm1 + end_comm2 - start_comm2 + end_comm3 - start_comm3 + end_comm4 - start_comm4 + end_comm5 - start_comm5).count();
+		auto time_total = time_setup + time_enroll + time_sig + time_capture + time_ver_sig + time_lookup + time_ver_permute + time_dec + time_check + time_comm;
+
 		cout << endl;
 		cout << "Elapsed time in us: " << endl;
-		cout << "Shared key setup: " << chrono::duration_cast<chrono::microseconds>(end_setup - start_setup).count() << endl;
-		cout << "Create enrollment: " << chrono::duration_cast<chrono::microseconds>(end_enroll - start_enroll).count() << endl;
-		cout << "Signature verification: " << chrono::duration_cast<chrono::microseconds>(end_sig - start_sig).count() << endl;
-		cout << "Capture: " << chrono::duration_cast<chrono::microseconds>(end_capture - start_capture).count() << endl;
-		cout << "Verification signatures: " << chrono::duration_cast<chrono::microseconds>(end_ver_sig- start_ver_sig).count() << endl;
-		cout << "Lookup: " << chrono::duration_cast<chrono::microseconds>(end_lookup - start_lookup).count() << endl;
-		cout << "Verify permutation: " << chrono::duration_cast<chrono::microseconds>(end_ver_permute - start_ver_permute).count() << endl;
-		cout << "Decryption of [B]: " << chrono::duration_cast<chrono::microseconds>(end_dec - start_dec).count() << endl;
-		cout << "Key check: " << chrono::duration_cast<chrono::microseconds>(end_check - start_check).count() << endl;
-		cout << "Total communication overhead: " << chrono::duration_cast<chrono::microseconds>(end_comm1 - start_comm1 + end_comm2 - start_comm2 + end_comm3 - start_comm3 + end_comm4 - start_comm4).count() << endl;
-
+		cout << "Shared key setup: " << time_setup << endl;
+		cout << "Create enrollment: " << time_enroll << endl;
+		cout << "Signature verification: " << time_sig << endl;
+		cout << "Capture: " << time_capture << endl;
+		cout << "Verification signatures: " << time_ver_sig << endl;
+		cout << "Lookup: " << time_lookup << endl;
+		cout << "Verify permutation: " << time_ver_permute << endl;
+		cout << "Decryption of [B]: " << time_dec << endl;
+		cout << "Key check: " << time_check << endl;
+		cout << "Total communication overhead: " << time_comm << endl;
+		cout << endl;
+		cout << "Total elapsed time in us: " << time_total << endl;
+		cout << "Percentage verify permutation / total server: " << (double) time_ver_permute / time_total << endl;
+		
 		io_service.stop();
 		th.join();
 	}
@@ -725,7 +897,7 @@ int Sensor::main_mal() {
 *	General main function
 */
 int main(int argc, char* argv[]) {
-	Sensor ss = Sensor("dlog_params2.txt");
+	Sensor ss = Sensor();
 
 	if(argc == 1) {
 		return ss.main_sh();

@@ -18,6 +18,6 @@ vector<vector<int>> permutation_matrix(int size);
 
 int main_math();
 
-void print_permutation_matrix(vector<vector<int>> A);
+void print_permutation_matrix(vector<vector<biginteger>> A);
 
 #endif

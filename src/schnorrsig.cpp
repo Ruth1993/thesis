@@ -8,17 +8,19 @@
 using namespace std;
 
 Signer::Signer() {
-	ConfigFile cf("dlog_params2.txt");
+	ConfigFile cf("dlog_params.txt");
 	string q_string = cf.Value("", "q");
 	string p_string = cf.Value("", "p");
 	string g_string = cf.Value("", "g");
 
-	dlog = make_shared<OpenSSLDlogZpSafePrime>(q_string, g_string, p_string);
+	//dlog = make_shared<OpenSSLDlogZpSafePrime>(q_string, g_string, p_string);
+	dlog = make_shared<OpenSSLDlogECF2m>("../../libscapi/include/configFiles/NISTEC.txt", "K-233");
+	//dlog = make_shared<OpenSSLDlogECFp>("B-163");
 
 	biginteger q = dlog->getOrder();
 	auto g = dlog->getGenerator();
 
-	H = make_shared<OpenSSLSHA256>();
+	H = make_shared<OpenSSLSHA512>();
 
 	alpha = getRandomInRange(0, q-1, get_seeded_prg().get());
 	y = dlog->exponentiate(g.get(), alpha);
@@ -35,12 +37,16 @@ Signature Signer::sign(vector<byte> msg) {
 	biginteger k = getRandomInRange(0, q-1, get_seeded_prg().get());
 	auto r = dlog->exponentiate(g.get(), k);
 	
+	auto start_hash = std::chrono::high_resolution_clock::now();
 	//set c = H(m || r) \in Z_q
 	H->update(msg, 0, msg.size());
 	vector<byte> r_byte = dlog->decodeGroupElementToByteArray(r.get());
 	H->update(r_byte, 0, r_byte.size());
 	vector<byte> c_byte;
 	H->hashFinal(c_byte, 0);
+	auto end_hash = std::chrono::high_resolution_clock::now();
+
+	cout << "time hash: " << chrono::duration_cast<chrono::microseconds>(end_hash - start_hash).count() << endl;
 	byte c_byte_arr[c_byte.size()];
 	copy_byte_vector_to_byte_array(c_byte, c_byte_arr, 0);
 	biginteger c = mod(decodeBigInteger(c_byte_arr, c_byte.size()), q);
@@ -54,14 +60,15 @@ Signature Signer::sign(vector<byte> msg) {
 }
 
 Verifier::Verifier() {
-	ConfigFile cf("dlog_params2.txt");
+	ConfigFile cf("dlog_params.txt");
 	string q_string = cf.Value("", "q");
 	string p_string = cf.Value("", "p");
 	string g_string = cf.Value("", "g");
 
-	dlog = make_shared<OpenSSLDlogZpSafePrime>(q_string, g_string, p_string);
+	//dlog = make_shared<OpenSSLDlogZpSafePrime>(q_string, g_string, p_string);
+	dlog = make_shared<OpenSSLDlogECF2m>("../../libscapi/include/configFiles/NISTEC.txt", "K-233");
 
-	H = make_shared<OpenSSLSHA256>();
+	H = make_shared<OpenSSLSHA512>();
 }
 
 bool Verifier::verify(vector<byte> msg, Signature sig, shared_ptr<GroupElement> y) {

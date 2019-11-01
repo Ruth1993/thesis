@@ -176,7 +176,8 @@ biginteger Party::recv_biginteger() {
 shared_ptr<GroupElement> Party::recv_group_element() {
 	shared_ptr<GroupElement> elem;
 
-	shared_ptr<GroupElementSendableData> elem_sendable = make_shared<ZpElementSendableData>(dlog->getOrder());
+	shared_ptr<GroupElementSendableData> elem_sendable = make_shared<ECElementSendableData>(dlog->getOrder(), dlog->getOrder());
+	//shared_ptr<GroupElementSendableData> elem_sendable = make_shared<ZpElementSendableData>(dlog->getOrder());
 	vector<byte> raw_msg;
 	channel->readWithSizeIntoVector(raw_msg);
 	elem_sendable->initFromByteVector(raw_msg);
@@ -373,6 +374,23 @@ vector<byte> Party::compute_n(int u, shared_ptr<AsymmetricCiphertext> k_enc, sha
 	n.insert(n.end(), aes_k_byte.begin(), aes_k_byte.end());
 
 	return n;
+}
+
+/*
+*		Compute [[B]] by multipling [[C]] and [[k]] element-wise
+*/
+vector<shared_ptr<AsymmetricCiphertext>> Party::calc_B_enc(vector<shared_ptr<AsymmetricCiphertext>> C_enc2, shared_ptr<AsymmetricCiphertext> K_enc2) {
+	vector<shared_ptr<AsymmetricCiphertext>> B_enc2;
+
+	for (shared_ptr<AsymmetricCiphertext> C_i_enc2 : C_enc2) {
+		auto start = chrono::steady_clock::now();
+		shared_ptr<AsymmetricCiphertext> B_i_enc2 = elgamal->multiply((ElGamalOnGroupElementCiphertext*)C_i_enc2.get(), (ElGamalOnGroupElementCiphertext*)K_enc2.get());
+		auto end = chrono::steady_clock::now();
+		//cout << "Time elapsed by computing [[C]]*[[k]] in us: " << chrono::duration_cast<chrono::microseconds>(end-start).count() << endl;
+		B_enc2.push_back(B_i_enc2);
+	}
+
+	return B_enc2;
 }
 
 /*

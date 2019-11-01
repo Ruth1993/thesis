@@ -65,13 +65,14 @@ vector<vector<int>> permutation_matrix(int size) {
 /*
 *	Print permutation matrix A_{ij}
 */
-void print_permutation_matrix(vector<vector<int>> A) {
-	int size = A.size();
+void print_permutation_matrix(vector<vector<biginteger>> A) {
+	int m = A[0].size();
+	int n = A.size();
 
 	cout << "A_{ij}: " << endl;
-	for (int i = 0; i < size; i++) {
-		for (int j = 0; j < size; j++) {
-			cout << A[i][j];
+	for (int i = 0; i < m; i++) {
+		for (int j = 0; j < n; j++) {
+			cout << A[j][i] << " ";
 		}
 
 		cout << endl;

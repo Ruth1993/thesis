@@ -16,7 +16,7 @@ using namespace std;
 
 class Sensor : public Party {
 public:
-	Sensor(string config_file_path);
+	Sensor();
 
 	pair<int, vector<int>> capture(int u, pair<int, int> template_size);
 
@@ -31,6 +31,8 @@ public:
 	vector<shared_ptr<AsymmetricCiphertext>> look_up(vector<int> vec_p, shared_ptr<Template_enc> T_enc);
 
 	shared_ptr<AsymmetricCiphertext> add_scores(vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc);
+
+	bool verify_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime);
 
 	bool verify_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime);
 

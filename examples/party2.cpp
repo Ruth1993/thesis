@@ -7,6 +7,7 @@
 #include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolDlog.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolPedersenCommittedValue.hpp"
 #include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolPedersenCmtKnowledge.hpp"
+#include "../../libscapi/include/interactive_mid_protocols/SigmaProtocolAnd.hpp"
 
 #include "../../libscapi/include/mid_layer/OpenSSLSymmetricEnc.hpp"
 #include "../../libscapi/include/primitives/DlogOpenSSL.hpp"
@@ -53,7 +54,7 @@ int main(int argc, char* argv[]) {
 
     //setup ElGamal communication
 	//First read dlog parameters from file
-	ConfigFile cf("dlog_params.txt");
+	/*ConfigFile cf("dlog_params.txt");
 	string p_string = cf.Value("", "p");
 	string g_string = cf.Value("", "g");
 	string q_string = cf.Value("", "q");
@@ -61,11 +62,14 @@ int main(int argc, char* argv[]) {
 	auto g = dlog->getGenerator();
     ElGamalOnGroupElementEnc elgamal(dlog);
     auto pair = elgamal.generateKey();
-    elgamal.setKey(pair.first, pair.second);
+    elgamal.setKey(pair.first, pair.second);*/
 
     try {
       channel->join(500, 5000);
       cout << "channel established" << endl;
+
+	  //Sigma Dlog AND protocol
+
 
       /*vector<byte> resMsg;
       channel->readWithSizeIntoVector(resMsg);
@@ -110,13 +114,58 @@ int main(int argc, char* argv[]) {
 			}*/
 
 			//Zero-knowledge proof stuff
-			/*auto dlog2 = make_shared<OpenSSLDlogECF2m>();
-			ZKFromSigmaVerifier verifier(channel, make_shared<SigmaDlogVerifierComputation>(dlog, 40, get_seeded_prg()), get_seeded_prg());
-			auto ch = dlog->createRandomElement();
-			auto msgA = make_shared<SigmaGroupElementMsg>(dlog->getIdentity()->generateSendableData());
-			auto msgZ = make_shared<SigmaBIMsg>();
-			shared_ptr<SigmaDlogCommonInput> input = make_shared<SigmaDlogCommonInput>(ch);
-			cout << verifier.verify(input.get(), msgA, msgZ) << endl;*/
+	  /*auto dlog = make_shared<OpenSSLDlogECF2m>("K-233");
+	  auto g = dlog->getGenerator();
+	  ZKFromSigmaVerifier verifier(channel, make_shared<SigmaDlogVerifierComputation>(dlog, 40, get_seeded_prg()), get_seeded_prg());
+	  auto msgA = make_shared<SigmaGroupElementMsg>(dlog->getIdentity()->generateSendableData());
+	  auto msgZ = make_shared<SigmaBIMsg>();
+	  auto co = dlog->exponentiate(g.get(), 3);
+	  shared_ptr<SigmaDlogCommonInput> input = make_shared<SigmaDlogCommonInput>(co);
+	  cout << "co: " << ((OpenSSLZpSafePrimeElement*)co.get())->getElementValue() << endl;
+	  cout << verifier.verify(input.get(), msgA, msgZ) << endl;*/
+
+		auto dlog = make_shared<OpenSSLDlogECF2m>("K-233");
+			auto g = dlog->getGenerator();
+
+			  vector<shared_ptr<SigmaVerifierComputation>> verifiers;
+
+			  biginteger r = 5;
+			  biginteger r2 = 85;
+			  auto co1 = dlog->exponentiate(g.get(), r);
+			  auto h = dlog->exponentiate(g.get(), 17);
+
+			  cout << "h: " << ((OpenSSLZpSafePrimeElement*)h.get())->getElementValue() << endl;
+			  auto co2 = dlog->exponentiate(h.get(), r);
+			  auto co3 = dlog->exponentiate(g.get(), r2);
+
+			for (int i = 0; i < 2; i++) {
+				  verifiers.push_back(make_shared<SigmaDlogVerifierComputation>(dlog, 40, get_seeded_prg()));
+			}
+
+			ZKFromSigmaVerifier verifier(channel, make_shared<SigmaANDVerifierComputation>(verifiers, 40), get_seeded_prg());
+
+			vector<shared_ptr<SigmaProtocolMsg>> msgAs;
+			vector<shared_ptr<SigmaProtocolMsg>> msgZs;
+
+			for (int i = 0; i < 2; i++) {
+				msgAs.push_back(make_shared<SigmaGroupElementMsg>(dlog->getIdentity()->generateSendableData()));
+				msgZs.push_back(make_shared<SigmaBIMsg>());
+			}
+
+			auto msgA = make_shared<SigmaMultipleMsg>(msgAs);
+			auto msgZ = make_shared<SigmaMultipleMsg>(msgZs);
+
+			vector<shared_ptr<SigmaCommonInput>> inputs;
+
+			inputs.push_back(make_shared<SigmaDlogCommonInput>(co1));
+			inputs.push_back(make_shared<SigmaDlogCommonInput>(co2));
+
+			cout << "g^r: " << ((OpenSSLZpSafePrimeElement*)co1.get())->getElementValue() << endl;
+			cout << "h^r: " << ((OpenSSLZpSafePrimeElement*)co2.get())->getElementValue() << endl;
+			cout << "g^85: " << ((OpenSSLZpSafePrimeElement*)co3.get())->getElementValue() << endl;
+
+			shared_ptr<SigmaMultipleCommonInput> input = make_shared<SigmaMultipleCommonInput>(inputs);
+			cout << "verified: " << verifier.verify(input.get(), msgA, msgZ) << endl;
 
 			//Fiat Shamir stuff
 			/*shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog);
@@ -169,7 +218,7 @@ int main(int argc, char* argv[]) {
 			cout << "proof accepted: " << output << endl;*/
 
 			//Pedersen commitment with proof
-			CmtPedersenWithProofsReceiver receiver(channel, 40, dlog);
+			/*CmtPedersenWithProofsReceiver receiver(channel, 40, dlog);
 			auto com = receiver.receiveCommitment();
 			long id = 0;
 			auto result = receiver.receiveDecommitment(id);
@@ -179,8 +228,8 @@ int main(int argc, char* argv[]) {
 			else {
 				cout << "the committed value is:" << result->toString() << endl;
 			}
-
-			cout << "proof accepted: " << receiver.verifyKnowledge(id) << endl;
+			
+			cout << "proof accepted: " << receiver.verifyKnowledge(id) << endl;*/
 			//Commitment stuff
       /*
       shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog2);

@@ -14,15 +14,12 @@
 
 using namespace std;
 
-Server::Server(string config_file_path) {
+Server::Server() {
 	//Intialize encryption objects
-	aes_enc = make_shared<OpenSSLCTREncRandomIV>("AES");
+	aes = make_shared<OpenSSLCTREncRandomIV>("AES");
 
-	ConfigFile cf(config_file_path);
-	string p = cf.Value("", "p");
-	string g = cf.Value("", "g");
-	string q = cf.Value("", "q");
-	dlog = make_shared<OpenSSLDlogZpSafePrime>(q, g, p);
+	dlog = make_shared<OpenSSLDlogECF2m>("../../libscapi/include/configFiles/NISTEC.txt", "K-233");
+	//dlog = make_shared<OpenSSLDlogECFp>("B-163");
 	elgamal = make_shared<ElGamalOnGroupElementEnc>(dlog);
 
 	//Generate and set ElGamal keypair
@@ -86,8 +83,49 @@ shared_ptr<GroupElement> Server::fetch_y(int u) {
 	return table.get_y(u);
 }
 
+vector<shared_ptr<AsymmetricCiphertext>> Server::compare_mal(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S) {
+	vector<shared_ptr<AsymmetricCiphertext>> C_enc;
+
+	elgamal->setKey(pk_shared);
+
+	auto g = dlog->getGenerator();
+	biginteger q = dlog->getOrder();
+
+	auto g_t = dlog->exponentiate(g.get(), t);
+
+	//first compute and encrypt g^-t
+	shared_ptr<GroupElement> g_min_t = dlog->getInverse(g_t.get());
+	GroupElementPlaintext p_g_min_t(g_min_t);
+	shared_ptr<AsymmetricCiphertext> c_g_min_t = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_min_t));
+
+	//cout << "g^-t: " << ((OpenSSLZpSafePrimeElement *)g_min_t.get())->getElementValue() << endl;
+
+	for (biginteger i = 0; i <= max_S - t; i++) {
+		//first compute t+i
+		//biginteger t_plus_i = t + i;
+		biginteger min_t_min_i = q - t - i;
+
+		//compute g^-(t+i) = g^(-t-i) and encrypt
+		//auto g_t_plus_i = dlog->exponentiate(g.get(), t_plus_i);
+		//auto g_min_t_plus_i = dlog->getInverse(g_t_plus_i.get());
+
+		auto g_min_t_min_i = dlog->exponentiate(g.get(), min_t_min_i);
+
+		GroupElementPlaintext p_g_min_t_min_i(g_min_t_min_i);
+		shared_ptr<AsymmetricCiphertext> c_g_min_t_min_i = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_min_t_min_i));
+
+		//multiply [[g^S]] * [[g^(t-i)]] = [[g^(S-t-i)]]
+		shared_ptr<AsymmetricCiphertext> result = elgamal->multiply(S_enc.get(), c_g_min_t_min_i.get());
+
+		//save result in C_enc
+		C_enc.push_back(result);
+	}
+
+	return C_enc;
+}
+
 /*
-*		Compare [[S]]  with threshold t resulting in [[C]]
+*	Compare [[S]]  with threshold t resulting in [[C]]
 */
 vector<shared_ptr<AsymmetricCiphertext>> Server::compare(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S) {
 	vector<shared_ptr<AsymmetricCiphertext>> C_enc;
@@ -102,7 +140,7 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::compare(shared_ptr<AsymmetricCi
 	//first compute and encrypt g^-t
 	shared_ptr<GroupElement> g_min_t = dlog->getInverse(g_t.get());
 	GroupElementPlaintext p_g_min_t(g_min_t);
-  shared_ptr<AsymmetricCiphertext> c_g_min_t = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_min_t));
+	shared_ptr<AsymmetricCiphertext> c_g_min_t = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_min_t));
 
 	//cout << "g^-t: " << ((OpenSSLZpSafePrimeElement *)g_min_t.get())->getElementValue() << endl;
 
@@ -142,36 +180,197 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::compare(shared_ptr<AsymmetricCi
 }
 
 /*
-*		Permute [[C]]
+*	Permute [[C]]
 */
 tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>, vector<vector<int>>> Server::permute(vector<shared_ptr<AsymmetricCiphertext>> C_enc) {
-	vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime;
-	vector<biginteger> vec_r;
+	int k = C_enc.size();
 
-	int n = C_enc.size();
+	vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime;
+	vector<biginteger> A_0(k, 0);
+
 	auto g = dlog->getGenerator();
 	biginteger q = dlog->getOrder();
 
 	//Randomly generate permutation matrix A_{ij}
-	vector<vector<int>> A = permutation_matrix(n);
+	vector<vector<int>> A = permutation_matrix(k);
 
-	for (int i = 0; i < n; i++) {
-		biginteger r = getRandomInRange(0, q - 1, get_seeded_prg().get());
-		auto vec_g_prime = dlog->exponentiate(g.get(), r);
-		auto vec_m_prime = dlog->exponentiate(((ElGamalPublicKey*) pk_shared.get())->getH().get(), r);
+	for (int i = 0; i < k; i++) {
+		//A_0[i] = getRandomInRange(0, q - 1, get_seeded_prg().get());
+		A_0[i] = 2;
+		auto vec_g_prime = dlog->exponentiate(g.get(), A_0[i]);
+		auto vec_m_prime = dlog->exponentiate(((ElGamalPublicKey*)pk_shared.get())->getH().get(), A_0[i]);
 
-		for (int j = 0; j < n; j++) {
-			if (A[j][i] == 1) {
-				vec_g_prime = dlog->multiplyGroupElements(vec_g_prime.get(), ((ElGamalOnGroupElementCiphertext*) C_enc[j].get())->getC1().get());
-				vec_m_prime = dlog->multiplyGroupElements(vec_m_prime.get(), ((ElGamalOnGroupElementCiphertext*) C_enc[j].get())->getC2().get());
+		for (int j = 0; j < k; j++) {
+			if (A[i][j] == 1) {
+				vec_g_prime = dlog->multiplyGroupElements(vec_g_prime.get(), ((ElGamalOnGroupElementCiphertext*)C_enc[j].get())->getC1().get());
+				vec_m_prime = dlog->multiplyGroupElements(vec_m_prime.get(), ((ElGamalOnGroupElementCiphertext*)C_enc[j].get())->getC2().get());
 			}
 		}
 
-		vec_r.push_back(r);
 		C_enc_prime.push_back(make_shared<ElGamalOnGroupElementCiphertext>(vec_g_prime, vec_m_prime));
 	}
 
-	return make_tuple(C_enc_prime, vec_r, A);
+	return make_tuple(C_enc_prime, A_0, A);
+}
+
+void Server::prove_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime, vector<biginteger> A_0, vector<vector<int>> perm_matrix) {
+	auto g = dlog->getGenerator();
+	//cout << "g: " << ((OpenSSLZpSafePrimeElement*)g.get())->getElementValue() << endl;
+	biginteger q = dlog->getOrder();
+	//cout << "q: " << q << endl;
+	auto gen = get_seeded_prg();
+
+	int k = C_enc_prime.size();
+	int k5 = k + 5;
+
+	//Receive F_k from verifier
+	vector<shared_ptr<GroupElement>> f = recv_vec_group_element();
+
+	vector<biginteger> a(k + 5, 0);
+	vector<vector<biginteger>> A(k + 1, a);
+
+	vector<biginteger> A_v0;
+	vector<biginteger> A_v_prime;
+	vector<biginteger> A_min_1i;
+
+	for (int i = -5; i < 0; i++) {
+		A_v0.push_back(getRandomInRange(2, 9, gen.get()));
+		A_v_prime.push_back(getRandomInRange(2, 9, gen.get()));
+	}
+
+	for (int i = 0; i < k; i++) {
+		A_v0.push_back(getRandomInRange(2, 9, gen.get()));
+		A_v_prime.push_back(getRandomInRange(2, 9, gen.get()));
+		A_min_1i.push_back(getRandomInRange(2, 9, gen.get()));
+	}
+
+	A[0] = A_v0;
+
+	vector<biginteger> A_min_2i(k, 0);
+	vector<biginteger> A_min_3i(k, 0);
+	vector<biginteger> A_min_4i(k, 0);
+
+	for (int i = 0; i < k; i++) {
+		biginteger A_min_2i;
+		biginteger A_min_3i;
+		biginteger A_min_4i;
+
+		//cout << "i: " << i << endl;
+
+		for (int j = 0; j < k; j++) {
+			//cout << "A_v0[j+5]: " << A_v0[j + 5] << endl;
+			A_min_2i += mod(3 * A_v0[j + 5] * A_v0[j + 5] * perm_matrix[j][i], q);
+			A_min_3i += mod(3 * A_v0[j + 5] * perm_matrix[j][i], q);
+			A_min_4i += mod(2 * A_v0[j + 5] * perm_matrix[j][i], q);
+		}
+
+		vector<biginteger> column(k + 5, 0);
+		column[0] = A_min_4i;
+		column[1] = A_min_3i;
+		column[2] = A_min_2i;
+		column[3] = A_min_1i[i];
+		column[4] = A_0[i];
+
+		for (int v = 0; v < k; v++) {
+			column[v + 5] = perm_matrix[v][i];
+		}
+
+		A[i + 1] = column;
+	}
+
+	print_permutation_matrix(A);
+
+	vector<shared_ptr<GroupElement>> f_prime;
+	shared_ptr<GroupElement> f_tilde_0_prime = dlog->getIdentity();
+	shared_ptr<GroupElement> g_0_prime = dlog->exponentiate(g.get(), A_v0[0]);
+	shared_ptr<GroupElement> m_0_prime = dlog->exponentiate(((ElGamalPublicKey*)pk_shared.get())->getH().get(), A_v0[0]);
+	biginteger w = (A_v0[-2 + 4] + A_v_prime[-3 + 4])*-1;
+	biginteger w_dot = A_v0[-4 + 4]*-1;
+
+	//cout << "before loop f_prime" << endl;
+
+	for (int micro = 0; micro <= k; micro++) {
+		auto element = dlog->getIdentity();
+
+		//cout << "u: " << micro << endl;
+
+		for (int v = 0; v < k5; v++) {
+			//cout << "A[" << micro << "][" << v << "]: " << A[micro][v] << endl;
+			element = dlog->multiplyGroupElements(element.get(), dlog->exponentiate(f[v].get(), A[micro][v]).get());
+			//element = dlog->multiplyGroupElements(element.get(), dlog->createRandomElement().get());
+			//cout << "v: " << v << endl;
+		}
+
+		f_prime.push_back(element);
+	}
+
+	//cout << "before loop f_tilde_0_prime" << endl;
+
+	for (int v = 0; v < k5; v++) {
+		f_tilde_0_prime = dlog->multiplyGroupElements(f_tilde_0_prime.get(), dlog->exponentiate(f[v].get(), A_v_prime[v]).get());
+	}
+
+	//cout << "before loop g_0_prime and m_0_prime" << endl;
+
+	for (int v = 0; v < k; v++) {
+		auto g_v = ((ElGamalOnGroupElementCiphertext*)C_enc[v].get())->getC1();
+		auto m_v = ((ElGamalOnGroupElementCiphertext*)C_enc[v].get())->getC2();
+
+		g_0_prime = dlog->multiplyGroupElements(g_0_prime.get(), dlog->exponentiate(g_v.get(), A_v0[v]).get());
+		m_0_prime = dlog->multiplyGroupElements(m_0_prime.get(), dlog->exponentiate(m_v.get(), A_v0[v]).get());
+	}
+
+	//cout << "before loop w and w_dot" << endl;
+
+	for (int j = 0; j < k; j++) {
+		w += mod(A_v0[j]*A_v0[j]*A_v0[j], q);
+		w_dot += mod(A_v0[j]*A_v0[j], q);
+	}
+
+	//The prover sends the following elements as commitment to the verifier
+	send_group_element(g_0_prime);
+	send_group_element(m_0_prime);
+	send_group_element(f_tilde_0_prime);
+	send_vec_group_element(f_prime);
+	send_biginteger(w);
+	send_biginteger(w_dot);
+
+	//Receive challenge from verifier
+	vector<biginteger> c = recv_vec_biginteger();
+
+	//Compute response
+	vector<biginteger> r(k + 5, 0);
+	vector<biginteger> r_prime(k+5, 0);
+
+	//cout << "before loop r" << endl;
+
+	for (int v = 0; v < k5; v++) {
+		for (int micro = 0; micro <= k; micro++) {
+			r[v] += mod(A[micro][v] * c[micro], q); //dit klopt
+
+			cout << "A[" << v<< "][" << micro << "]: " << (A[micro][v]) << endl;
+			cout << "r[" << v << "]: " << (r[v]) << endl;
+			cout << "c[" << micro << "]: " << (c[micro]) << endl << endl;
+		}
+	}
+
+	/*for (int v = 0; v < r.size(); v++) {
+		cout << "r[" << v << "]: " << r[v] << endl;
+	}*/
+
+	//cout << "before loop r'" << endl;
+
+	for (int v = 0; v < k5; v++) {
+		r_prime[v] = A_v_prime[v];
+
+		for (int i = 0; i < k; i++) {
+			r_prime[v] += mod(A[i][v] * c[i+1]*c[i+1], q);
+		}
+	}
+
+	//Send respone to verifier
+	send_vec_biginteger(r);
+	send_vec_biginteger(r_prime);
 }
 
 /*
@@ -309,27 +508,10 @@ void Server::prove_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, v
 }
 
 /*
-*		Fetch key pair ([[k]], AES_k(1)) corresponding to u from table
+*	Fetch key pair ([[k]], AES_k(1)) corresponding to u from table
 */
 pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> Server::fetch_key_pair(int u) {
 	return table.get_key_pair(u);
-}
-
-/*
-*		Compute [[B]] by multipling [[C]] and [[k]] element-wise
-*/
-vector<shared_ptr<AsymmetricCiphertext>> Server::calc_B_enc(vector<shared_ptr<AsymmetricCiphertext>> C_enc2, shared_ptr<AsymmetricCiphertext> K_enc2) {
-	vector<shared_ptr<AsymmetricCiphertext>> B_enc2;
-
-	for(shared_ptr<AsymmetricCiphertext> C_i_enc2 : C_enc2) {
-		auto start = chrono::steady_clock::now();
-		shared_ptr<AsymmetricCiphertext> B_i_enc2 = elgamal->multiply((ElGamalOnGroupElementCiphertext*) C_i_enc2.get(), (ElGamalOnGroupElementCiphertext*) K_enc2.get());
-		auto end = chrono::steady_clock::now();
-		//cout << "Time elapsed by computing [[C]]*[[k]] in us: " << chrono::duration_cast<chrono::microseconds>(end-start).count() << endl;
-		B_enc2.push_back(B_i_enc2);
-	}
-
-	return B_enc2;
 }
 
 /*
@@ -350,14 +532,14 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::D1(vector<shared_ptr<Asymmetric
 }
 
 /*
-*		Return table size
+*	Return table size
 */
 int Server::size_table() {
 	return table.size();
 }
 
 /*
-*		Test function calc_B_enc
+*	Test function calc_B_enc
 */
 void Server::test_calc_B_enc() {
 	auto g = dlog->getGenerator();
@@ -383,7 +565,7 @@ void Server::test_calc_B_enc() {
 }
 
 /*
-*		Test function compare
+*	Test function compare
 */
 void Server::test_compare(biginteger t, biginteger max_S) {
 	auto g = dlog->getGenerator();
@@ -413,7 +595,7 @@ void Server::test_compare(biginteger t, biginteger max_S) {
 }
 
 /*
-*		Test function permute
+*	Test function permute
 */
 void Server::test_permute(int size) {
 	auto g = dlog->getGenerator();
@@ -445,7 +627,7 @@ void Server::test_permute(int size) {
 }
 
 /*
-*		Test function D1
+*	Test function D1
 */
 shared_ptr<ElGamalOnGroupElementCiphertext> Server::test_D1(shared_ptr<AsymmetricCiphertext> cipher) {
 	shared_ptr<GroupElement> c_1_prime = dlog->exponentiate(((ElGamalOnGroupElementCiphertext*) cipher.get())->getC1().get(), ((ElGamalPrivateKey*) sk_own.get())->getX());
@@ -537,6 +719,77 @@ int Server::main_sh() {
 	return 0;
 }
 
+void Server::test() {
+	int k = 3;
+	vector<vector<int>> perm_matrix = permutation_matrix(k);
+
+	auto g = dlog->getGenerator();
+	biginteger q = dlog->getOrder();
+	auto gen = get_seeded_prg();
+
+	vector<biginteger> a(k + 5, 9);
+	vector<vector<biginteger>> A(k + 1, a);
+
+	//Randomly choose {A_{0i} \in_R Z_q} for i=1,...,k
+	vector<biginteger> A_0(k, 9);
+
+	for (int i = 0; i < k; i++) {
+		A_0[i] = getRandomInRange(2, 8, gen.get());
+	}
+
+	vector<biginteger> A_v0;
+	vector<biginteger> A_v_prime;
+	vector<biginteger> A_min_1i;
+
+	for (int i = -5; i < 0; i++) {
+		A_v0.push_back(getRandomInRange(2, 8, gen.get()));
+		A_v_prime.push_back(getRandomInRange(2, 8, gen.get()));
+	}
+
+	for (int i = 0; i < k; i++) {
+		A_v0.push_back(getRandomInRange(2, 8, gen.get()));
+		A_v_prime.push_back(getRandomInRange(2,8, gen.get()));
+		A_min_1i.push_back(getRandomInRange(2, 8, gen.get()));
+	}
+
+	A[0] = A_v0;
+
+	vector<biginteger> A_min_2i(k, 9);
+	vector<biginteger> A_min_3i(k, 9);
+	vector<biginteger> A_min_4i(k, 9);
+
+	for (int i = 0; i < k; i++) {
+		biginteger A_min_2i;
+		biginteger A_min_3i;
+		biginteger A_min_4i;
+
+		cout << "i: " << i << endl;
+
+		for (int j = 0; j < k; j++) {
+			cout << "A_v0[j+5]: " << A_v0[j + 5] << endl;
+			A_min_2i += mod(3 * A_v0[j + 5]*A_v0[j+5] * perm_matrix[j][i], q);
+			A_min_3i += mod(3 * A_v0[j + 5] * perm_matrix[j][i], q);
+			A_min_4i += mod(2 * A_v0[j + 5] * perm_matrix[j][i], q);
+		}
+
+		vector<biginteger> column(k + 5, 0);
+		column[0] = A_min_4i;
+		column[1] = A_min_3i;
+		column[2] = A_min_2i;
+		column[3] = A_min_1i[i];
+		column[4] = A_0[i];
+
+		for (int v = 0; v < k; v++) {
+			column[v + 5] = perm_matrix[v][i];
+		}
+
+		A[i+1] = column;
+	}
+
+	cout << endl;
+	print_permutation_matrix(A);
+}
+
 int Server::main_mal() {
 	try {
 		//First set up channel
@@ -616,15 +869,19 @@ int Server::main_mal() {
 		send_signature(sig_n);
 		send_group_element(y);
 
+		cout << "<----(T_u, [[k]], AES_k(1), sig(m), sig(n))----" << endl;
+
 		//Receive [[S]] from sensor
 		shared_ptr<AsymmetricCiphertext> S_enc = recv_msg_enc();
+
+		cout << "----[[S]]---->" << endl;
 
 		auto end_comm3 = std::chrono::high_resolution_clock::now();
 
 		//Compare [[S]] with t
 		auto start_compare = std::chrono::high_resolution_clock::now();
 
-		vector<shared_ptr<AsymmetricCiphertext>> C_enc = compare(S_enc, t, max_S);
+		vector<shared_ptr<AsymmetricCiphertext>> C_enc = compare_mal(S_enc, t, max_S);
 
 		auto end_compare = std::chrono::high_resolution_clock::now();
 
@@ -636,7 +893,7 @@ int Server::main_mal() {
 		auto end_permute = std::chrono::high_resolution_clock::now();
 
 		vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime = get<0>(permutation);
-		vector<biginteger> r = get<1>(permutation);
+		vector<biginteger> A_0 = get<1>(permutation);
 		vector<vector<int>> A = get<2>(permutation);
 
 		//Send [[C]] and [[C']] to sensor
@@ -645,12 +902,14 @@ int Server::main_mal() {
 		send_vec_enc(C_enc);
 		send_vec_enc(C_enc_prime);
 
+		cout << "<----([[C]], [[C']])----" << endl;
+
 		auto end_comm4 = std::chrono::high_resolution_clock::now();
 
 		//Prove permutation function \pi([[C]] = [[C']]
 		auto start_prove_permute = std::chrono::high_resolution_clock::now();
 
-		prove_permutation(C_enc, C_enc_prime, r, A);
+		prove_permutation2(C_enc, C_enc_prime, A_0, A);
 
 		auto end_prove_permute = std::chrono::high_resolution_clock::now();
 
@@ -675,17 +934,36 @@ int Server::main_mal() {
 
 		auto end_comm5 = std::chrono::high_resolution_clock::now();
 
+
+		//Print elapsed time
+		auto time_setup = chrono::duration_cast<chrono::microseconds>(end_setup - start_setup).count();
+		auto time_store = chrono::duration_cast<chrono::microseconds>(end_store - start_store).count();
+		auto time_fetch = chrono::duration_cast<chrono::microseconds>(end_fetch - start_fetch).count();
+		auto time_compare = chrono::duration_cast<chrono::microseconds>(end_compare - start_compare).count();
+		auto time_permute = chrono::duration_cast<chrono::microseconds>(end_permute - start_permute).count();
+		auto time_prove_permute = chrono::duration_cast<chrono::microseconds>(end_prove_permute - start_prove_permute).count();
+		auto time_B = chrono::duration_cast<chrono::microseconds>(end_B - start_B).count();
+		auto time_dec = chrono::duration_cast<chrono::microseconds>(end_dec - start_dec).count();
+		auto time_comm = chrono::duration_cast<chrono::microseconds>(end_comm1 - start_comm1 + end_comm2 - start_comm2 + end_comm3 - start_comm3 + end_comm4 - start_comm4 + end_comm5 - start_comm5).count();
+		auto time_total = time_setup + time_store + time_fetch + time_compare + time_permute + time_prove_permute + time_B + time_dec + time_comm;
+
 		cout << endl;
 		cout << "Elapsed time in us: " << endl;
-		cout << "Shared key setup: " << chrono::duration_cast<chrono::microseconds>(end_setup - start_setup).count() << endl;
-		cout << "Store in table: " << chrono::duration_cast<chrono::microseconds>(end_store - start_store).count() << endl;
-		cout << "Fetch from table: " << chrono::duration_cast<chrono::microseconds>(end_fetch - start_fetch).count() << endl;
-		cout << "Comparison: " << chrono::duration_cast<chrono::microseconds>(end_compare - start_compare).count() << endl;
-		cout << "Permutation: " << chrono::duration_cast<chrono::microseconds>(end_permute - start_permute).count() << endl;
-		cout << "Prove permutation: " << chrono::duration_cast<chrono::microseconds>(end_prove_permute - start_prove_permute).count() << endl;
-		cout << "[[C]]*[[k]]: " << chrono::duration_cast<chrono::microseconds>(end_B - start_B).count() << endl;
-		cout << "Partial decryption: " << chrono::duration_cast<chrono::microseconds>(end_dec - start_dec).count() << endl;
-		cout << "Total communication overhead: " << chrono::duration_cast<chrono::microseconds>(end_comm1 - start_comm1 + end_comm2 - start_comm2 + end_comm3 - start_comm3 + end_comm4 - start_comm4 + end_comm5 - start_comm5).count() << endl;
+		cout << "Shared key setup: " << time_setup << endl;
+		cout << "Store in table: " << time_store << endl;
+		cout << "Fetch from table: " << time_fetch << endl;
+		cout << "Comparison: " << time_compare << endl;
+		cout << "Permutation: " << time_permute << endl;
+		cout << "Prove permutation: " << time_prove_permute << endl;
+		cout << "[[C]]*[[k]]: " << time_B << endl;
+		cout << "Partial decryption: " << time_dec << endl;
+		cout << "Total communication overhead: " << time_comm << endl;
+		cout << endl;
+		cout << "Total elapsed time in us: " << time_total << endl;
+		cout << "Percentage comparison / total server: " << (double) time_compare / time_total << endl;
+		cout << "Percentage prove permutation / total server: " << (double)time_prove_permute / time_total << endl;
+
+		cout << endl;
 
 		io_service.stop();
 		th.join();
@@ -698,7 +976,7 @@ int Server::main_mal() {
 }
 
 int main(int argc, char* argv[]) {
-	Server sv = Server("dlog_params2.txt");
+	Server sv = Server();
 
 	if(argc == 1) {
 		return sv.main_sh();
