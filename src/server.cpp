@@ -195,8 +195,8 @@ tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>, vector<vecto
 	vector<vector<int>> A = permutation_matrix(k);
 
 	for (int i = 0; i < k; i++) {
-		//A_0[i] = getRandomInRange(0, q - 1, get_seeded_prg().get());
-		A_0[i] = 2;
+		A_0[i] = getRandomInRange(0, q - 1, get_seeded_prg().get());
+
 		auto vec_g_prime = dlog->exponentiate(g.get(), A_0[i]);
 		auto vec_m_prime = dlog->exponentiate(((ElGamalPublicKey*)pk_shared.get())->getH().get(), A_0[i]);
 
@@ -213,11 +213,13 @@ tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>, vector<vecto
 	return make_tuple(C_enc_prime, A_0, A);
 }
 
-void Server::prove_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime, vector<biginteger> A_0, vector<vector<int>> perm_matrix) {
+/*
+*	Prove permutation function has been executed in a semi-honest fashion
+*	Protocol based on paper Furukawa: Efficient and Verifiable Shuffling and Shuffle-Decryption
+*/
+void Server::prove_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime, vector<biginteger> A_0, vector<vector<int>> perm_matrix) {
 	auto g = dlog->getGenerator();
-	//cout << "g: " << ((OpenSSLZpSafePrimeElement*)g.get())->getElementValue() << endl;
 	biginteger q = dlog->getOrder();
-	//cout << "q: " << q << endl;
 	auto gen = get_seeded_prg();
 
 	int k = C_enc_prime.size();
@@ -229,102 +231,83 @@ void Server::prove_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc, 
 	vector<biginteger> a(k + 5, 0);
 	vector<vector<biginteger>> A(k + 1, a);
 
-	vector<biginteger> A_v0;
-	vector<biginteger> A_v_prime;
-	vector<biginteger> A_min_1i;
+	//Generate A_v0 and A_v' for v=-4,...,k and A_-1i for i=1,...,k
+	vector<biginteger> A_v0(k5, 0);
+	vector<biginteger> A_v_prime(k5, 0);
+	vector<biginteger> A_min_1(k, 0);
 
-	for (int i = -5; i < 0; i++) {
-		A_v0.push_back(getRandomInRange(2, 9, gen.get()));
-		A_v_prime.push_back(getRandomInRange(2, 9, gen.get()));
+	for (int i = 0; i < k5; i++) {
+		A_v0[i] = getRandomInRange(0, q-1, gen.get());
+		A_v_prime[i] = getRandomInRange(0, q-1, gen.get());
 	}
 
 	for (int i = 0; i < k; i++) {
-		A_v0.push_back(getRandomInRange(2, 9, gen.get()));
-		A_v_prime.push_back(getRandomInRange(2, 9, gen.get()));
-		A_min_1i.push_back(getRandomInRange(2, 9, gen.get()));
+		A_min_1[i] = getRandomInRange(0, q-1, gen.get());
 	}
 
 	A[0] = A_v0;
 
-	vector<biginteger> A_min_2i(k, 0);
-	vector<biginteger> A_min_3i(k, 0);
-	vector<biginteger> A_min_4i(k, 0);
-
+	//Compute A_-2i, A_-3i, A_4i
 	for (int i = 0; i < k; i++) {
 		biginteger A_min_2i;
 		biginteger A_min_3i;
 		biginteger A_min_4i;
 
-		//cout << "i: " << i << endl;
-
 		for (int j = 0; j < k; j++) {
-			//cout << "A_v0[j+5]: " << A_v0[j + 5] << endl;
-			A_min_2i += mod(3 * A_v0[j + 5] * A_v0[j + 5] * perm_matrix[j][i], q);
-			A_min_3i += mod(3 * A_v0[j + 5] * perm_matrix[j][i], q);
-			A_min_4i += mod(2 * A_v0[j + 5] * perm_matrix[j][i], q);
+			A_min_2i = mod(A_min_2i + 3 * A_v0[j + 5] * A_v0[j + 5] * perm_matrix[i][j], q);
+			A_min_3i = mod(A_min_3i + 3 * A_v0[j + 5] * perm_matrix[i][j], q);
+			A_min_4i = mod(A_min_4i + 2 * A_v0[j + 5] * perm_matrix[i][j], q);
 		}
 
 		vector<biginteger> column(k + 5, 0);
 		column[0] = A_min_4i;
 		column[1] = A_min_3i;
 		column[2] = A_min_2i;
-		column[3] = A_min_1i[i];
+		column[3] = A_min_1[i];
 		column[4] = A_0[i];
 
 		for (int v = 0; v < k; v++) {
-			column[v + 5] = perm_matrix[v][i];
+			column[v + 5] = perm_matrix[i][v];
 		}
 
 		A[i + 1] = column;
 	}
 
-	print_permutation_matrix(A);
+	//print_permutation_matrix(A);
 
+	//Compute f_micro', f_tilde_0', g_0', m_0', w and w_dot
 	vector<shared_ptr<GroupElement>> f_prime;
 	shared_ptr<GroupElement> f_tilde_0_prime = dlog->getIdentity();
-	shared_ptr<GroupElement> g_0_prime = dlog->exponentiate(g.get(), A_v0[0]);
-	shared_ptr<GroupElement> m_0_prime = dlog->exponentiate(((ElGamalPublicKey*)pk_shared.get())->getH().get(), A_v0[0]);
-	biginteger w = (A_v0[-2 + 4] + A_v_prime[-3 + 4])*-1;
+	shared_ptr<GroupElement> g_0_prime = dlog->exponentiate(g.get(), A_v0[0+4]);
+	shared_ptr<GroupElement> m_0_prime = dlog->exponentiate(((ElGamalPublicKey*)pk_shared.get())->getH().get(), A_v0[0+4]);
+	biginteger w = (A_v0[-2 + 4] + A_v_prime[-3 + 4]) * -1;
 	biginteger w_dot = A_v0[-4 + 4]*-1;
-
-	//cout << "before loop f_prime" << endl;
 
 	for (int micro = 0; micro <= k; micro++) {
 		auto element = dlog->getIdentity();
 
-		//cout << "u: " << micro << endl;
-
 		for (int v = 0; v < k5; v++) {
-			//cout << "A[" << micro << "][" << v << "]: " << A[micro][v] << endl;
 			element = dlog->multiplyGroupElements(element.get(), dlog->exponentiate(f[v].get(), A[micro][v]).get());
-			//element = dlog->multiplyGroupElements(element.get(), dlog->createRandomElement().get());
-			//cout << "v: " << v << endl;
 		}
 
 		f_prime.push_back(element);
 	}
 
-	//cout << "before loop f_tilde_0_prime" << endl;
-
 	for (int v = 0; v < k5; v++) {
 		f_tilde_0_prime = dlog->multiplyGroupElements(f_tilde_0_prime.get(), dlog->exponentiate(f[v].get(), A_v_prime[v]).get());
 	}
-
-	//cout << "before loop g_0_prime and m_0_prime" << endl;
 
 	for (int v = 0; v < k; v++) {
 		auto g_v = ((ElGamalOnGroupElementCiphertext*)C_enc[v].get())->getC1();
 		auto m_v = ((ElGamalOnGroupElementCiphertext*)C_enc[v].get())->getC2();
 
-		g_0_prime = dlog->multiplyGroupElements(g_0_prime.get(), dlog->exponentiate(g_v.get(), A_v0[v]).get());
-		m_0_prime = dlog->multiplyGroupElements(m_0_prime.get(), dlog->exponentiate(m_v.get(), A_v0[v]).get());
+		g_0_prime = dlog->multiplyGroupElements(g_0_prime.get(), dlog->exponentiate(g_v.get(), A_v0[v+5]).get());
+		m_0_prime = dlog->multiplyGroupElements(m_0_prime.get(), dlog->exponentiate(m_v.get(), A_v0[v+5]).get());
 	}
 
-	//cout << "before loop w and w_dot" << endl;
-
 	for (int j = 0; j < k; j++) {
-		w += mod(A_v0[j]*A_v0[j]*A_v0[j], q);
-		w_dot += mod(A_v0[j]*A_v0[j], q);
+		w = mod(w + A_v0[j+5]*A_v0[j+5]*A_v0[j+5], q);
+		w_dot = mod(w_dot + A_v0[j+5]*A_v0[j+5], q);
 	}
 
 	//The prover sends the following elements as commitment to the verifier
@@ -342,29 +325,17 @@ void Server::prove_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc, 
 	vector<biginteger> r(k + 5, 0);
 	vector<biginteger> r_prime(k+5, 0);
 
-	//cout << "before loop r" << endl;
-
 	for (int v = 0; v < k5; v++) {
 		for (int micro = 0; micro <= k; micro++) {
-			r[v] += mod(A[micro][v] * c[micro], q); //dit klopt
-
-			cout << "A[" << v<< "][" << micro << "]: " << (A[micro][v]) << endl;
-			cout << "r[" << v << "]: " << (r[v]) << endl;
-			cout << "c[" << micro << "]: " << (c[micro]) << endl << endl;
+			r[v] = mod(r[v] + A[micro][v] * c[micro], q);
 		}
 	}
-
-	/*for (int v = 0; v < r.size(); v++) {
-		cout << "r[" << v << "]: " << r[v] << endl;
-	}*/
-
-	//cout << "before loop r'" << endl;
 
 	for (int v = 0; v < k5; v++) {
 		r_prime[v] = A_v_prime[v];
 
-		for (int i = 0; i < k; i++) {
-			r_prime[v] += mod(A[i][v] * c[i+1]*c[i+1], q);
+		for (int i = 1; i <= k; i++) {
+			r_prime[v] = mod(r_prime[v] + (A[i][v] * c[i]*c[i]), q);
 		}
 	}
 
@@ -375,8 +346,9 @@ void Server::prove_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc, 
 
 /*
 *	Prove permutation function has been executed in a semi-honest fashion
+*	Protocol based on paper Furukawa: An Efficient Scheme for Proving a Shuffle
 */
-void Server::prove_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime, vector<biginteger> vec_r, vector<vector<int>> A) {
+void Server::prove_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime, vector<biginteger> vec_r, vector<vector<int>> A) {
 	auto g = dlog->getGenerator();
 	biginteger q = dlog->getOrder();
 	auto gen = get_seeded_prg();
@@ -454,10 +426,10 @@ void Server::prove_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, v
 		biginteger exp_vec_w_dot = sigma * vec_r[i];
 
 		for (int j = 0; j < n; j++) {
-			vec_g_tilde_prime_elem = dlog->multiplyGroupElements(vec_g_tilde_prime_elem.get(), dlog->exponentiate(vec_g_tilde[j].get(), A[j][i]).get());
-			exp_vec_t_dot = mod(exp_vec_t_dot + (3 * vec_alpha[j] * A[j][i]), q);
-			exp_vec_v_dot = mod(exp_vec_v_dot + (3*vec_alpha[j]*vec_alpha[j] * A[j][i]), q);
-			exp_vec_w_dot = mod(exp_vec_w_dot + (2*vec_alpha[j]*A[j][i]), q);
+			vec_g_tilde_prime_elem = dlog->multiplyGroupElements(vec_g_tilde_prime_elem.get(), dlog->exponentiate(vec_g_tilde[j].get(), A[i][j]).get());
+			exp_vec_t_dot = mod(exp_vec_t_dot + (3 * vec_alpha[j] * A[i][j]), q);
+			exp_vec_v_dot = mod(exp_vec_v_dot + (3*vec_alpha[j]*vec_alpha[j] * A[i][j]), q);
+			exp_vec_w_dot = mod(exp_vec_w_dot + (2*vec_alpha[j]*A[i][j]), q);
 		}
 
 		vec_g_tilde_prime.push_back(vec_g_tilde_prime_elem);
@@ -498,7 +470,7 @@ void Server::prove_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, v
 		vec_s[i] = vec_alpha[i];
 
 		for (int j = 0; j < n; j++) {
-			vec_s[i] = mod(vec_s[i] + A[i][j] * c[j], q);
+			vec_s[i] = mod(vec_s[i] + A[j][i] * c[j], q);
 		}
 	}
 
@@ -909,7 +881,7 @@ int Server::main_mal() {
 		//Prove permutation function \pi([[C]] = [[C']]
 		auto start_prove_permute = std::chrono::high_resolution_clock::now();
 
-		prove_permutation2(C_enc, C_enc_prime, A_0, A);
+		prove_permutation(C_enc, C_enc_prime, A_0, A);
 
 		auto end_prove_permute = std::chrono::high_resolution_clock::now();
 

@@ -218,17 +218,17 @@ shared_ptr<AsymmetricCiphertext> Sensor::add_scores(vector<shared_ptr<Asymmetric
 	return result;
 }
 
-bool Sensor::verify_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime) {
+/*
+*	Verify correctness of permutation function \pi
+*	Protocol based on paper Furukawa: Efficient and Verifiable Shuffling and Shuffle-Decryption
+*/
+bool Sensor::verify_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime) {
 	auto g = dlog->getGenerator();
-	//cout << "g: " << ((OpenSSLZpSafePrimeElement*)g.get())->getElementValue() << endl;
 	biginteger q = dlog->getOrder();
-	//cout << "q: " << q << endl;
 	auto gen = get_seeded_prg();
 
 	int k = C_enc_prime.size();
 	int k5 = k + 5;
-
-	//cout << "before loop f_u" << endl;
 
 	//Generate F_k \in_R Z_q for k=-4,...,k
 	vector<shared_ptr<GroupElement>> f(k+5, 0);
@@ -239,8 +239,6 @@ bool Sensor::verify_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc,
 	//Send F_k to prover
 	send_vec_group_element(f);
 
-	//cout << "before receive commitment" << endl;
-
 	//Receive commitment from prover
 	auto g_0_prime = recv_group_element();
 	auto m_0_prime = recv_group_element();
@@ -249,26 +247,20 @@ bool Sensor::verify_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc,
 	biginteger w = recv_biginteger();
 	biginteger w_dot = recv_biginteger();
 
-	//cout << "before challenge" << endl;
-
 	//Pick random challenge c_i \in Z_q for i=1,...,k
 	vector<biginteger> c(k+1, 0);
 	c[0] = 1;
 
 	for (int i = 1; i < k+1; i++) {
-		c[i] = getRandomInRange(10, 20, gen.get());
+		c[i] = getRandomInRange(0, q-1, gen.get());
 	}
 
 	//Send challenge to the prover
 	send_vec_biginteger(c);
 
-	//cout << "before receive response" << endl;
-
 	//Receive response from prover
 	vector<biginteger> r = recv_vec_biginteger();
 	vector<biginteger> r_prime = recv_vec_biginteger();
-
-	//cout << "before verify 9" << endl;
 
 	//Verify following statements (in paper Furukawa statements 9-13)
 	biginteger alpha = getRandomInRange(0, q - 1, gen.get());
@@ -276,24 +268,18 @@ bool Sensor::verify_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc,
 	auto left9 = dlog->getIdentity();
 	auto right9 = dlog->multiplyGroupElements(f_prime[0].get(), dlog->exponentiate(f_tilde_0_prime.get(), alpha).get());
 
-	//cout << "before loop 9" << endl;
-
 	for (int v = 0; v < k+5; v++) {
 		left9 = dlog->multiplyGroupElements(left9.get(), dlog->exponentiate(f[v].get(), mod(r[v]+alpha*r_prime[v], q)).get());
 	}
 
-	//cout << "before right9" << endl;
-
-	for (int i = 0; i < k; i++) {
-		right9 = dlog->multiplyGroupElements(right9.get(), dlog->exponentiate(f_prime[i + 1].get(), mod(c[i + 1] + alpha * c[i + 1] * c[i + 1], q)).get());
+	for (int i = 1; i <= k; i++) {
+		right9 = dlog->multiplyGroupElements(right9.get(), dlog->exponentiate(f_prime[i].get(), mod(c[i] + alpha * c[i] * c[i], q)).get());
 	}
-
-	//cout << "before verify 10 and 11" << endl;
 
 	auto left10 = dlog->exponentiate(g.get(), r[0+4]);
 	auto right10 = dlog->exponentiate(g_0_prime.get(), c[0]);
 
-	auto left11 = dlog->exponentiate(g.get(), r[0+4]);
+	auto left11 = dlog->exponentiate(((ElGamalPublicKey*)pk_shared.get())->getH().get(), r[0+4]);
 	auto right11 = dlog->exponentiate(m_0_prime.get(), c[0]);
 
 	for (int v = 0; v < k; v++) {
@@ -303,22 +289,12 @@ bool Sensor::verify_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc,
 		auto g_micro_prime = ((ElGamalOnGroupElementCiphertext*)C_enc_prime[v].get())->getC1();
 		auto m_micro_prime = ((ElGamalOnGroupElementCiphertext*)C_enc_prime[v].get())->getC2();
 
-		cout << "r[" << (v+5) << "]: " << r[v + 5] << endl << endl;
-		cout << "c[" << (v + 1) << "]: " << c[v + 1] << endl << endl;
-
-		auto left10_test = dlog->exponentiate(g_v.get(), r[v + 5]);
-		auto right10_test = dlog->exponentiate(g_micro_prime.get(), c[v + 1]);
-		left10 = dlog->multiplyGroupElements(left10.get(), left10_test.get());
-		right10 = dlog->multiplyGroupElements(right10.get(), right10_test.get());
-
-		cout << "left10[" << v << "]:" << ((OpenSSLZpSafePrimeElement*)left10_test.get())->getElementValue() << endl;
-		cout << "right10[" << v << "]:" << ((OpenSSLZpSafePrimeElement*)right10_test.get())->getElementValue() << endl;
+		left10 = dlog->multiplyGroupElements(left10.get(), dlog->exponentiate(g_v.get(), r[v + 5]).get());
+		right10 = dlog->multiplyGroupElements(right10.get(), dlog->exponentiate(g_micro_prime.get(), c[v + 1]).get());
 
 		left11 = dlog->multiplyGroupElements(left11.get(), dlog->exponentiate(m_v.get(), r[v+5]).get());
 		right11 = dlog->multiplyGroupElements(right11.get(), dlog->exponentiate(m_micro_prime.get(), c[v+1]).get());
 	}
-
-	//cout << "before verify 12 and 13" << endl;
 
 	biginteger left12;
 	biginteger right12 = mod(r[-2 + 4] + r_prime[-3+4]+w, q);
@@ -327,21 +303,18 @@ bool Sensor::verify_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc,
 	biginteger right13 = mod(r[-4 + 4] + w_dot, q);
 
 	for (int j = 0; j < k; j++) {
-		left12 += mod(r[j+5] * r[j+5] * r[j+5] - c[j+1]*c[j+1]*c[j+1], q);
-		left13 += mod(r[j+5] * r[j+5] - c[j+1] * c[j+1], q);
+		left12 = mod(left12 + (r[j+5] * r[j+5] * r[j+5] - c[j+1]*c[j+1]*c[j+1]), q);
+		left13 = mod(left13 + (r[j+5] * r[j+5] - c[j+1] * c[j+1]), q);
 	}
 
-	cout << "left13: " << left13 << endl;
-	cout << "right13: " << right13 << endl;
-
-	return (*left10.get() == *right10.get());
-	//return (*left9.get() == *right9.get()) && (*left10.get() == *right10.get()) && (*left11.get() == *right11.get()) && (left12 == right12) && (left13 == right13);
+	return (*left9.get() == *right9.get()) && (*left10.get() == *right10.get()) && (*left11.get() == *right11.get()) && (left12 == right12) && (left13 == right13);
 }
 
 /*
 *	Verify correctness of permutation function \pi
+*	Protocol based on paper Furukawa: An Efficient Scheme for Proving a Shuffle
 */
-bool Sensor::verify_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime) {
+bool Sensor::verify_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime) {
 	auto g = dlog->getGenerator();
 	biginteger q = dlog->getOrder();
 	auto gen = get_seeded_prg();
@@ -817,7 +790,7 @@ int Sensor::main_mal() {
 		//Verify permutation \pi([[C]] = [[C']]
 		auto start_ver_permute = std::chrono::high_resolution_clock::now();
 
-		cout << "permutation verified: " << verify_permutation2(C_enc, C_enc_prime) << endl;
+		cout << "permutation verified: " << verify_permutation(C_enc, C_enc_prime) << endl;
 
 		auto end_ver_permute = std::chrono::high_resolution_clock::now();
 
