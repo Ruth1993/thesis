@@ -83,49 +83,89 @@ shared_ptr<GroupElement> Server::fetch_y(int u) {
 	return table.get_y(u);
 }
 
-vector<shared_ptr<AsymmetricCiphertext>> Server::compare_mal(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S) {
+/*
+*
+*/
+tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>> Server::compare_mal(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S) {
 	vector<shared_ptr<AsymmetricCiphertext>> C_enc;
+	vector<shared_ptr<AsymmetricCiphertext>> C_enc_no_r_sv;
+	vector<biginteger> blind_vals;
 
 	elgamal->setKey(pk_shared);
 
 	auto g = dlog->getGenerator();
 	biginteger q = dlog->getOrder();
 
-	auto g_t = dlog->exponentiate(g.get(), t);
+	biginteger j = max_S - t;
 
-	//first compute and encrypt g^-t
-	shared_ptr<GroupElement> g_min_t = dlog->getInverse(g_t.get());
-	GroupElementPlaintext p_g_min_t(g_min_t);
-	shared_ptr<AsymmetricCiphertext> c_g_min_t = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_min_t));
+	for (int i = 0; i <= j; i++) {
+		biginteger x = bct_p1();
 
-	//cout << "g^-t: " << ((OpenSSLZpSafePrimeElement *)g_min_t.get())->getElementValue() << endl;
-
-	for (biginteger i = 0; i <= max_S - t; i++) {
-		//first compute t+i
-		//biginteger t_plus_i = t + i;
+		//compute g^(-t-i)
 		biginteger min_t_min_i = q - t - i;
-
-		//compute g^-(t+i) = g^(-t-i) and encrypt
-		//auto g_t_plus_i = dlog->exponentiate(g.get(), t_plus_i);
-		//auto g_min_t_plus_i = dlog->getInverse(g_t_plus_i.get());
-
 		auto g_min_t_min_i = dlog->exponentiate(g.get(), min_t_min_i);
 
+		//encrypt g^(-t-i) using x as randomness
 		GroupElementPlaintext p_g_min_t_min_i(g_min_t_min_i);
-		shared_ptr<AsymmetricCiphertext> c_g_min_t_min_i = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_min_t_min_i));
+		shared_ptr<AsymmetricCiphertext> c_g_min_t_min_i = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_min_t_min_i), x);
 
 		//multiply [[g^S]] * [[g^(t-i)]] = [[g^(S-t-i)]]
-		shared_ptr<AsymmetricCiphertext> result = elgamal->multiply(S_enc.get(), c_g_min_t_min_i.get());
+		shared_ptr<AsymmetricCiphertext> result = elgamal->multiply(S_enc.get(), c_g_min_t_min_i.get(), x);
+
+		//save result in C_enc_no_r_sv
+		C_enc_no_r_sv.push_back(result);
+
+		//finally blind result with r obtained by the Augmented Coin Tossing protocol
+		pair<biginteger, biginteger> acointoss = act_p1(2,6);
+		biginteger r = acointoss.first;
+		blind_vals.push_back(r);
+
+		auto c1 = ((ElGamalOnGroupElementCiphertext*)result.get())->getC1();
+		auto c2 = ((ElGamalOnGroupElementCiphertext*)result.get())->getC2();
+
+		auto c1_blind = dlog->exponentiate(c1.get(), r);
+		auto c2_blind = dlog->exponentiate(c2.get(), r);
+
+		shared_ptr<AsymmetricCiphertext> result_blind = make_shared<ElGamalOnGroupElementCiphertext>(ElGamalOnGroupElementCiphertext(c1_blind, c2_blind));
 
 		//save result in C_enc
-		C_enc.push_back(result);
+		C_enc.push_back(result_blind);
 	}
 
-	return C_enc;
+	return make_tuple(C_enc, C_enc_no_r_sv, blind_vals);
 }
 
 /*
-*	Compare [[S]]  with threshold t resulting in [[C]]
+*	Prove correctness of comparison operation
+*/
+void Server::prove_compare(vector<biginteger> r, vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime_prime) {
+
+	for (int i = 0; i <= max_S - t; i++) {
+		vector<shared_ptr<GroupElement>> c;
+		vector<shared_ptr<GroupElement>> c_prime_prime;
+
+		auto c1 = ((ElGamalOnGroupElementCiphertext*)C_enc[i].get())->getC1();
+		auto c1_prime_prime = ((ElGamalOnGroupElementCiphertext*)C_enc_prime_prime[i].get())->getC1();
+
+		auto c2 = ((ElGamalOnGroupElementCiphertext*)C_enc[i].get())->getC2();
+		auto c2_prime_prime = ((ElGamalOnGroupElementCiphertext*)C_enc_prime_prime[i].get())->getC2();
+
+		c.push_back(c1);
+		c.push_back(c2);
+
+		c_prime_prime.push_back(c1_prime_prime);
+		c_prime_prime.push_back(c2_prime_prime);
+
+		//add com(r), etc
+
+		zkpk_prove(r[i], c, c_prime_prime);
+	}
+
+
+}
+
+/*
+*	Compare [[S]] with threshold t resulting in [[C]]
 */
 vector<shared_ptr<AsymmetricCiphertext>> Server::compare(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S) {
 	vector<shared_ptr<AsymmetricCiphertext>> C_enc;
@@ -135,42 +175,28 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::compare(shared_ptr<AsymmetricCi
 	auto g = dlog->getGenerator();
 	biginteger q = dlog->getOrder();
 
-	auto g_t = dlog->exponentiate(g.get(), t);
-
-	//first compute and encrypt g^-t
-	shared_ptr<GroupElement> g_min_t = dlog->getInverse(g_t.get());
-	GroupElementPlaintext p_g_min_t(g_min_t);
-	shared_ptr<AsymmetricCiphertext> c_g_min_t = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_min_t));
-
-	//cout << "g^-t: " << ((OpenSSLZpSafePrimeElement *)g_min_t.get())->getElementValue() << endl;
-
 	for(biginteger i=0; i<=max_S-t; i++) {
-		//first compute t+i
-		biginteger t_plus_i = t+i;
+		//compute g^(-t-i)
+		biginteger min_t_min_i = q - t - i;
+		auto g_min_t_min_i = dlog->exponentiate(g.get(), min_t_min_i);
 
-		//compute g^-(t+i) = g^(-t-i) and encrypt
-		auto g_t_plus_i = dlog->exponentiate(g.get(), t_plus_i);
-		shared_ptr<GroupElement> g_min_t_plus_i = dlog->getInverse(g_t_plus_i.get());
-		GroupElementPlaintext p_g_min_t_plus_i(g_min_t_plus_i);
-		shared_ptr<AsymmetricCiphertext> c_g_min_t_plus_i = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_min_t_plus_i));
+		//encrypt g^(-t-i) using x as randomness
+		GroupElementPlaintext p_g_min_t_min_i(g_min_t_min_i);
+		shared_ptr<AsymmetricCiphertext> c_g_min_t_min_i = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_min_t_min_i));
 
 		//multiply [[g^S]] * [[g^(t-i)]] = [[g^(S-t-i)]]
-		shared_ptr<AsymmetricCiphertext> result = elgamal->multiply(S_enc.get(), c_g_min_t_plus_i.get());
+		shared_ptr<AsymmetricCiphertext> result = elgamal->multiply(S_enc.get(), c_g_min_t_min_i.get());
 
 		//finally blind the result with random value r
-		auto id = dlog->getIdentity();
-		GroupElementPlaintext p_id(id);
-		shared_ptr<AsymmetricCiphertext> result_blind = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_id));
 		biginteger r = getRandomInRange(0, q-1, get_seeded_prg().get());
 
-		while(r > 0) {
-			if(r & 1) {
-					result_blind = elgamal->multiply(result_blind.get(), result.get());
-			}
+		auto c1 = ((ElGamalOnGroupElementCiphertext*)result.get())->getC1();
+		auto c2 = ((ElGamalOnGroupElementCiphertext*)result.get())->getC2();
 
-			result = elgamal->multiply(result.get(), result.get());
-			r >>= 1;
-		}
+		auto c1_blind = dlog->exponentiate(c1.get(), r);
+		auto c2_blind = dlog->exponentiate(c2.get(), r);
+
+		shared_ptr<AsymmetricCiphertext> result_blind = make_shared<ElGamalOnGroupElementCiphertext>(ElGamalOnGroupElementCiphertext(c1_blind, c2_blind));
 
 		//save result in C_enc
 		C_enc.push_back(result_blind);
@@ -215,7 +241,7 @@ tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>, vector<vecto
 
 /*
 *	Prove permutation function has been executed in a semi-honest fashion
-*	Protocol based on paper Furukawa: Efficient and Verifiable Shuffling and Shuffle-Decryption
+*	Implementation of first protocol paper in Furukawa: Efficient and Verifiable Shuffling and Shuffle-Decryption
 */
 void Server::prove_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime, vector<biginteger> A_0, vector<vector<int>> perm_matrix) {
 	auto g = dlog->getGenerator();
@@ -346,7 +372,7 @@ void Server::prove_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, v
 
 /*
 *	Prove permutation function has been executed in a semi-honest fashion
-*	Protocol based on paper Furukawa: An Efficient Scheme for Proving a Shuffle
+*	Implementation of protocol in paper Furukawa: An Efficient Scheme for Proving a Shuffle
 */
 void Server::prove_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime, vector<biginteger> vec_r, vector<vector<int>> A) {
 	auto g = dlog->getGenerator();
@@ -501,6 +527,29 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::D1(vector<shared_ptr<Asymmetric
 	}
 
 	return B_enc2;
+}
+
+/*
+*	Prove partial decryption step
+*/
+void Server::prove_D1(vector<shared_ptr<AsymmetricCiphertext>> B_enc2, vector<shared_ptr<AsymmetricCiphertext>> B_enc) {
+	biginteger sk_sv = ((ElGamalPrivateKey*)sk_own.get())->getX();
+	auto pk_sv = ((ElGamalPublicKey*)pk_own.get())->getH();
+
+	vector<shared_ptr<GroupElement>> c1_prime;
+	vector<shared_ptr<GroupElement>> c1;
+	
+	//Add first parameter of ElGamal encryption of [B] and [[B]], respectively, to c1' (vector of y's) and c1 (vector of bases)
+	for (int i = 0; i < B_enc2.size(); i++) {
+		c1_prime.push_back(((ElGamalOnGroupElementCiphertext*)B_enc2[i].get())->getC1());
+		c1.push_back(((ElGamalOnGroupElementCiphertext*)B_enc[i].get())->getC1());
+	}
+
+	//finally add y2=g^sk_sv and pk_sv to c1' and c1, respectively
+	c1_prime.push_back(pk_sv);
+	c1.push_back(dlog->getGenerator());
+
+	zkpk_prove(sk_sv, c1_prime, c1);
 }
 
 /*
@@ -687,79 +736,7 @@ int Server::main_sh() {
 		cerr << e.what();
 	}
 
-
 	return 0;
-}
-
-void Server::test() {
-	int k = 3;
-	vector<vector<int>> perm_matrix = permutation_matrix(k);
-
-	auto g = dlog->getGenerator();
-	biginteger q = dlog->getOrder();
-	auto gen = get_seeded_prg();
-
-	vector<biginteger> a(k + 5, 9);
-	vector<vector<biginteger>> A(k + 1, a);
-
-	//Randomly choose {A_{0i} \in_R Z_q} for i=1,...,k
-	vector<biginteger> A_0(k, 9);
-
-	for (int i = 0; i < k; i++) {
-		A_0[i] = getRandomInRange(2, 8, gen.get());
-	}
-
-	vector<biginteger> A_v0;
-	vector<biginteger> A_v_prime;
-	vector<biginteger> A_min_1i;
-
-	for (int i = -5; i < 0; i++) {
-		A_v0.push_back(getRandomInRange(2, 8, gen.get()));
-		A_v_prime.push_back(getRandomInRange(2, 8, gen.get()));
-	}
-
-	for (int i = 0; i < k; i++) {
-		A_v0.push_back(getRandomInRange(2, 8, gen.get()));
-		A_v_prime.push_back(getRandomInRange(2,8, gen.get()));
-		A_min_1i.push_back(getRandomInRange(2, 8, gen.get()));
-	}
-
-	A[0] = A_v0;
-
-	vector<biginteger> A_min_2i(k, 9);
-	vector<biginteger> A_min_3i(k, 9);
-	vector<biginteger> A_min_4i(k, 9);
-
-	for (int i = 0; i < k; i++) {
-		biginteger A_min_2i;
-		biginteger A_min_3i;
-		biginteger A_min_4i;
-
-		cout << "i: " << i << endl;
-
-		for (int j = 0; j < k; j++) {
-			cout << "A_v0[j+5]: " << A_v0[j + 5] << endl;
-			A_min_2i += mod(3 * A_v0[j + 5]*A_v0[j+5] * perm_matrix[j][i], q);
-			A_min_3i += mod(3 * A_v0[j + 5] * perm_matrix[j][i], q);
-			A_min_4i += mod(2 * A_v0[j + 5] * perm_matrix[j][i], q);
-		}
-
-		vector<biginteger> column(k + 5, 0);
-		column[0] = A_min_4i;
-		column[1] = A_min_3i;
-		column[2] = A_min_2i;
-		column[3] = A_min_1i[i];
-		column[4] = A_0[i];
-
-		for (int v = 0; v < k; v++) {
-			column[v + 5] = perm_matrix[v][i];
-		}
-
-		A[i+1] = column;
-	}
-
-	cout << endl;
-	print_permutation_matrix(A);
 }
 
 int Server::main_mal() {
@@ -846,18 +823,37 @@ int Server::main_mal() {
 		//Receive [[S]] from sensor
 		shared_ptr<AsymmetricCiphertext> S_enc = recv_msg_enc();
 
-		cout << "----[[S]]---->" << endl;
-
 		auto end_comm3 = std::chrono::high_resolution_clock::now();
 
 		//Compare [[S]] with t
 		auto start_compare = std::chrono::high_resolution_clock::now();
 
-		vector<shared_ptr<AsymmetricCiphertext>> C_enc = compare_mal(S_enc, t, max_S);
+		tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>> comparison_malicious = compare_mal(S_enc, t, max_S);
+		vector<shared_ptr<AsymmetricCiphertext>> C_enc = get<0>(comparison_malicious);
+		vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime_prime = get<1>(comparison_malicious);
+		vector<biginteger> r = get<2>(comparison_malicious);
 
 		auto end_compare = std::chrono::high_resolution_clock::now();
 
-		//Permute [[C]] to get [[C']
+		//Send [[C]] to sensor
+		auto start_comm4 = std::chrono::high_resolution_clock::now();
+
+		send_vec_enc(C_enc);
+
+		auto end_comm4 = std::chrono::high_resolution_clock::now();
+
+		cout << "<-------[[C]]------" << endl;
+			 
+		//Prove comparison operation
+		auto start_prove_compare = std::chrono::high_resolution_clock::now();
+
+		prove_compare(r, C_enc, C_enc_prime_prime);
+
+		auto end_prove_compare = std::chrono::high_resolution_clock::now();
+
+		cout << "<-------ZK-Proof Comparison------>" << endl;
+
+		//Permute [[C]] to get [[C']]
 		auto start_permute = std::chrono::high_resolution_clock::now();
 
 		tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>, vector<vector<int>>> permutation = permute(C_enc);
@@ -868,15 +864,14 @@ int Server::main_mal() {
 		vector<biginteger> A_0 = get<1>(permutation);
 		vector<vector<int>> A = get<2>(permutation);
 
-		//Send [[C]] and [[C']] to sensor
-		auto start_comm4 = std::chrono::high_resolution_clock::now();
+		//Send [[C']] to sensor
+		auto start_comm5 = std::chrono::high_resolution_clock::now();
 
-		send_vec_enc(C_enc);
 		send_vec_enc(C_enc_prime);
 
-		cout << "<----([[C]], [[C']])----" << endl;
+		auto end_comm5 = std::chrono::high_resolution_clock::now();
 
-		auto end_comm4 = std::chrono::high_resolution_clock::now();
+		cout << "<----[[C']]----" << endl;
 
 		//Prove permutation function \pi([[C]] = [[C']]
 		auto start_prove_permute = std::chrono::high_resolution_clock::now();
@@ -885,6 +880,8 @@ int Server::main_mal() {
 
 		auto end_prove_permute = std::chrono::high_resolution_clock::now();
 
+		cout << "<------ZK-Proof Permutation------>" << endl;
+
 		//Multiply elements in [[C]] with [[k]]
 		auto start_B = std::chrono::high_resolution_clock::now();
 
@@ -892,19 +889,34 @@ int Server::main_mal() {
 
 		auto end_B = std::chrono::high_resolution_clock::now();
 
+		cout << "[[B]] = [[C']] + [[k]]" << endl;
+
 		//Perform partial decryption function D1
-		auto start_dec = std::chrono::high_resolution_clock::now();
+		auto start_D1 = std::chrono::high_resolution_clock::now();
 
 		vector<shared_ptr<AsymmetricCiphertext>> B_enc2 = D1(B_enc);
 
-		auto end_dec = std::chrono::high_resolution_clock::now();
+		auto end_D1 = std::chrono::high_resolution_clock::now();
+
+		cout << "D1([[B]]) = [B]" << endl;
 
 		//Send [B] to sensor
-		auto start_comm5 = std::chrono::high_resolution_clock::now();
+		auto start_comm6 = std::chrono::high_resolution_clock::now();
 
 		send_vec_enc(B_enc2);
 
-		auto end_comm5 = std::chrono::high_resolution_clock::now();
+		auto end_comm6 = std::chrono::high_resolution_clock::now();
+
+		cout << "<-------[B]--------" << endl;
+
+		//Prove partial decryption D1
+		auto start_prove_D1 = std::chrono::high_resolution_clock::now();
+
+		prove_D1(B_enc2, B_enc);
+
+		auto end_prove_D1 = std::chrono::high_resolution_clock::now();
+
+		cout << "<--------ZK-Proof Partial Decryption ------->" << endl;
 
 
 		//Print elapsed time
@@ -912,12 +924,16 @@ int Server::main_mal() {
 		auto time_store = chrono::duration_cast<chrono::microseconds>(end_store - start_store).count();
 		auto time_fetch = chrono::duration_cast<chrono::microseconds>(end_fetch - start_fetch).count();
 		auto time_compare = chrono::duration_cast<chrono::microseconds>(end_compare - start_compare).count();
+		auto time_prove_compare = chrono::duration_cast<chrono::microseconds>(end_prove_compare - start_prove_compare).count();
 		auto time_permute = chrono::duration_cast<chrono::microseconds>(end_permute - start_permute).count();
 		auto time_prove_permute = chrono::duration_cast<chrono::microseconds>(end_prove_permute - start_prove_permute).count();
 		auto time_B = chrono::duration_cast<chrono::microseconds>(end_B - start_B).count();
-		auto time_dec = chrono::duration_cast<chrono::microseconds>(end_dec - start_dec).count();
-		auto time_comm = chrono::duration_cast<chrono::microseconds>(end_comm1 - start_comm1 + end_comm2 - start_comm2 + end_comm3 - start_comm3 + end_comm4 - start_comm4 + end_comm5 - start_comm5).count();
-		auto time_total = time_setup + time_store + time_fetch + time_compare + time_permute + time_prove_permute + time_B + time_dec + time_comm;
+		auto time_D1 = chrono::duration_cast<chrono::microseconds>(end_D1 - start_D1).count();
+		auto time_prove_D1 = chrono::duration_cast<chrono::microseconds>(end_prove_D1 - start_prove_D1).count();
+		auto time_comm = chrono::duration_cast<chrono::microseconds>(end_comm1 - start_comm1 + end_comm2 - start_comm2 + end_comm3 - start_comm3 + end_comm4 - start_comm4 + end_comm5 - start_comm5 + end_comm6 - start_comm6).count();
+		
+		auto time_total = time_setup + time_store + time_fetch + time_compare + time_prove_compare + time_permute + time_prove_permute + time_B + time_D1 + time_prove_D1 + time_comm;
+		auto time_alpha = time_compare + time_prove_compare + time_permute + time_B + time_D1 + time_prove_D1;
 
 		cout << endl;
 		cout << "Elapsed time in us: " << endl;
@@ -925,15 +941,19 @@ int Server::main_mal() {
 		cout << "Store in table: " << time_store << endl;
 		cout << "Fetch from table: " << time_fetch << endl;
 		cout << "Comparison: " << time_compare << endl;
+		cout << "Prove comparison: " << time_prove_compare << endl;
 		cout << "Permutation: " << time_permute << endl;
 		cout << "Prove permutation: " << time_prove_permute << endl;
-		cout << "[[C]]*[[k]]: " << time_B << endl;
-		cout << "Partial decryption: " << time_dec << endl;
-		cout << "Total communication overhead: " << time_comm << endl;
-		cout << endl;
+		cout << "[[C]]+[[k]]: " << time_B << endl;
+		cout << "Partial decryption: " << time_D1 << endl;
+		cout << "Prove partial decryption: " << time_prove_D1 << endl;
+		cout << "Total communication overhead: " << time_comm << endl << endl;
+
 		cout << "Total elapsed time in us: " << time_total << endl;
 		cout << "Percentage comparison / total server: " << (double) time_compare / time_total << endl;
-		cout << "Percentage prove permutation / total server: " << (double)time_prove_permute / time_total << endl;
+		cout << "Percentage prove permutation / total server: " << (double)time_prove_permute / time_total << endl << endl;
+
+		cout << "Total elapsed time in us for alpha: " << time_alpha << endl;
 
 		cout << endl;
 

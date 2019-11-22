@@ -52,7 +52,7 @@ public:
 
 	Verifier();
 
-	bool verify(vector<byte> msg, Signature sig, shared_ptr<GroupElement>);
+	bool verify(vector<byte> msg, Signature sig, shared_ptr<GroupElement> y);
 };
 
 void key_gen(int lambda);

@@ -219,8 +219,84 @@ shared_ptr<AsymmetricCiphertext> Sensor::add_scores(vector<shared_ptr<Asymmetric
 }
 
 /*
+*	
+*/
+pair<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<CmtCCommitmentMsg>>> Sensor::compare_mal(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S) {
+	vector<shared_ptr<AsymmetricCiphertext>> C_enc_no_r_ss;
+	vector<shared_ptr<CmtCCommitmentMsg>> commitments_r;
+
+	elgamal->setKey(pk_shared);
+
+	auto g = dlog->getGenerator();
+	biginteger q = dlog->getOrder();
+
+	biginteger j = max_S - t;
+
+	for (int i = 0; i <= j; i++) {
+		biginteger x = bct_p2();
+		cout << "x_" << i << ": " << x << endl;
+
+		//compute g^(-t-i)
+		biginteger min_t_min_i = q - t - i;
+		auto g_min_t_min_i = dlog->exponentiate(g.get(), min_t_min_i);
+
+		//encrypt g^(-t-i) using x as randomness
+		GroupElementPlaintext p_g_min_t_min_i(g_min_t_min_i);
+		shared_ptr<AsymmetricCiphertext> c_g_min_t_min_i = elgamal->encrypt(make_shared<GroupElementPlaintext>(p_g_min_t_min_i), x);
+
+		//multiply [[g^S]] * [[g^(-t-i)]] = [[g^(S-t-i)]]
+		shared_ptr<AsymmetricCiphertext> result = elgamal->multiply(S_enc.get(), c_g_min_t_min_i.get(), x);
+
+		//save result in C_enc
+		C_enc_no_r_ss.push_back(result);
+
+		//Perform Augmented Coin Tossing to obtain Com(r)
+		auto com_r = act_p2(2, 6);
+
+		commitments_r.push_back(com_r);
+	}
+
+	return make_pair(C_enc_no_r_ss, commitments_r);
+}
+
+bool Sensor::verify_compare(int soundness, vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_no_r_ss, vector<shared_ptr<CmtCCommitmentMsg>> commitments_r) {
+
+	bool result = true;
+	
+	for (int i = 0; i <= (max_S-t); i++) {
+		auto com_r_pedersen = dynamic_cast<CmtPedersenCommitmentMessage*>(commitments_r[i].get());
+		if (com_r_pedersen == NULL) {
+			throw invalid_argument("The received message should be an instance of CmtPedersenCommitmentMessage");
+		}
+		auto cmt = commitments_r[i]->getCommitment();
+		auto ge = static_pointer_cast<GroupElementSendableData>(cmt);
+
+		auto com_r_element = dlog->reconstructElement(true, ge.get());
+		
+		vector<shared_ptr<GroupElement>> c;
+		vector<shared_ptr<GroupElement>> c_prime_prime;
+
+		auto c1 = ((ElGamalOnGroupElementCiphertext*)C_enc[i].get())->getC1();
+		auto c1_prime_prime = ((ElGamalOnGroupElementCiphertext*)C_enc_no_r_ss[i].get())->getC1();
+
+		auto c2 = ((ElGamalOnGroupElementCiphertext*)C_enc[i].get())->getC2();
+		auto c2_prime_prime = ((ElGamalOnGroupElementCiphertext*)C_enc_no_r_ss[i].get())->getC2();
+	
+		c.push_back(c1);
+		c.push_back(c2);
+
+		c_prime_prime.push_back(c1_prime_prime);
+		c_prime_prime.push_back(c2_prime_prime);
+
+		result = (result && zkpk_verify(soundness, c, c_prime_prime));
+	}
+	
+	return result;
+}
+
+/*
 *	Verify correctness of permutation function \pi
-*	Protocol based on paper Furukawa: Efficient and Verifiable Shuffling and Shuffle-Decryption
+*	Implementation of first protocol paper in Furukawa: Efficient and Verifiable Shuffling and Shuffle-Decryption
 */
 bool Sensor::verify_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime) {
 	auto g = dlog->getGenerator();
@@ -312,7 +388,7 @@ bool Sensor::verify_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, 
 
 /*
 *	Verify correctness of permutation function \pi
-*	Protocol based on paper Furukawa: An Efficient Scheme for Proving a Shuffle
+*	Implementation of protocol in paper Furukawa: An Efficient Scheme for Proving a Shuffle
 */
 bool Sensor::verify_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime) {
 	auto g = dlog->getGenerator();
@@ -400,6 +476,27 @@ bool Sensor::verify_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc,
 	}
 	
 	return (*left11.get() == *right11.get()) && (*left12.get() == *right12.get()) && (*left13.get() == *right13.get()) && (*left14.get() == *right14.get()) && (*left15.get() == *right15.get()) && (*left16.get() == *right16.get());
+}
+
+/*
+*	Verify partial decryption
+*/
+bool Sensor::verify_D1(int soundness, vector<shared_ptr<AsymmetricCiphertext>> B_enc2, vector<shared_ptr<AsymmetricCiphertext>> B_enc) {
+	auto pk_sv = ((ElGamalPublicKey*)pk_other.get())->getH();
+	
+	vector<shared_ptr<GroupElement>> c1_prime;
+	vector<shared_ptr<GroupElement>> c1;
+
+	//Add first parameter of ElGamal encryption of [B] and [[B]], respectively, to c1' (vector of y's) and c1 (vector of bases)
+	for (int i = 0; i < B_enc2.size(); i++) {
+		c1_prime.push_back(((ElGamalOnGroupElementCiphertext*)B_enc2[i].get())->getC1());
+		c1.push_back(((ElGamalOnGroupElementCiphertext*)B_enc[i].get())->getC1());
+	}
+
+	c1_prime.push_back(pk_sv);
+	c1.push_back(dlog->getGenerator());
+
+	return zkpk_verify(soundness, c1_prime, c1);
 }
 
 /*
@@ -599,13 +696,13 @@ int Sensor::main_sh() {
 		cout << "channel established" << endl;
 
 		//Receive public key from server
-		shared_ptr<PublicKey> pk_sv = recv_pk();
+		pk_other = recv_pk();
 
 		//Send own public key to Server
 		send_pk();
 
 		//Set shared public key
-		key_setup(pk_sv);
+		key_setup(pk_other);
 
 		//Create enrollment parameters and send to server
 		int u_enroll = 1;
@@ -674,13 +771,13 @@ int Sensor::main_mal() {
 		//Receive public key from server
 		auto start_setup = std::chrono::high_resolution_clock::now();
 
-		shared_ptr<PublicKey> pk_sv = recv_pk();
+		pk_other = recv_pk();
 
 		//Send own public key to Server
 		send_pk();
 
 		//Set shared public key
-		key_setup(pk_sv);
+		key_setup(pk_other);
 
 		auto end_setup = std::chrono::high_resolution_clock::now();
 
@@ -755,18 +852,27 @@ int Sensor::main_mal() {
 		vector<byte> m = compute_m(u, T_enc);
 		vector<byte> n = compute_n(u, k_enc, aes_k_1);
 
-		cout << "[[T_u]] verified: " << verifier->verify(m, sig_m, y) << endl;
-		cout << "([[k]], AES_k(1)) verified: " << verifier->verify(n, sig_n, y) << endl;
+		bool template_ver = verifier->verify(m, sig_m, y);
+		bool keys_ver = verifier->verify(n, sig_n, y);
 
 		auto end_ver_sig = std::chrono::high_resolution_clock::now();
 
-		//Lookup vec_p in [[T_u]] and add up partial similarity scores
+		cout << "[[T_u]] verified: " << template_ver << endl;
+		cout << "([[k]], AES_k(1)) verified: " << keys_ver << endl;
+
+		//Lookup vec_p in [[T_u]] 
 		auto start_lookup = std::chrono::high_resolution_clock::now();
 
 		vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc = look_up(vec_p, T_enc);
-		shared_ptr<AsymmetricCiphertext> S_enc = add_scores(vec_s_enc);
 
 		auto end_lookup = std::chrono::high_resolution_clock::now();
+
+		//Add up partial similarity scores
+		auto start_add_scores = std::chrono::high_resolution_clock::now();
+
+		shared_ptr<AsymmetricCiphertext> S_enc = add_scores(vec_s_enc);
+
+		auto end_add_scores = std::chrono::high_resolution_clock::now();
 
 		//Send [[S]] to server
 		auto start_comm3 = std::chrono::high_resolution_clock::now();
@@ -777,22 +883,48 @@ int Sensor::main_mal() {
 
 		cout << "----[[S]]---->" << endl;
 
-		//Receive [[C]] and [[C']] from server
+		//Compute [[C'']] ([[C]] without blinding factors r) itself
+
+		pair<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<CmtCCommitmentMsg>>> comparison_malicious = compare_mal(S_enc, t, max_S);
+		vector<shared_ptr<AsymmetricCiphertext>> C_enc_no_r_ss = comparison_malicious.first;
+		vector<shared_ptr<CmtCCommitmentMsg>> commitments_r = comparison_malicious.second;
+
+		cout << "size : " << C_enc_no_r_ss.size() << endl;
+		cout << "size : " << commitments_r.size() << endl;
+
+		//Receive [[C]] from server
 		auto start_comm4 = std::chrono::high_resolution_clock::now();
 
 		vector<shared_ptr<AsymmetricCiphertext>> C_enc = recv_vec_enc();
-		vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime = recv_vec_enc();
 
-		cout << "<----([[C]], [[C']])---" << endl;
+		cout << "C_enc received" << endl;
 
 		auto end_comm4 = std::chrono::high_resolution_clock::now();
+
+		//Verify comparison
+		auto start_ver_compare = std::chrono::high_resolution_clock::now();
+
+		bool compare_ver = verify_compare(40, C_enc, C_enc_no_r_ss, commitments_r);
+
+		auto end_ver_compare = std::chrono::high_resolution_clock::now();
+
+		cout << "Comparison verified: " << compare_ver << endl;
+
+		//Receive [[C']] from server
+		auto start_comm5 = std::chrono::high_resolution_clock::now();
+
+		vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime = recv_vec_enc();
+
+		auto end_comm5 = std::chrono::high_resolution_clock::now();
 
 		//Verify permutation \pi([[C]] = [[C']]
 		auto start_ver_permute = std::chrono::high_resolution_clock::now();
 
-		cout << "permutation verified: " << verify_permutation(C_enc, C_enc_prime) << endl;
+		bool permutation_ver = verify_permutation(C_enc, C_enc_prime);
 
 		auto end_ver_permute = std::chrono::high_resolution_clock::now();
+
+		cout << "Permutation verified: " << permutation_ver << endl;
 
 		//Also compute [[B]] = [[C']] + [[k]] to check server's computation of [[B]]
 		auto start_B = std::chrono::high_resolution_clock::now();
@@ -801,22 +933,34 @@ int Sensor::main_mal() {
 
 		auto end_B = std::chrono::high_resolution_clock::now();
 
+		cout << "[[B]] = [[C']] + [[k]]" << endl;
+
 		//Receive [B] from server
-		auto start_comm5 = std::chrono::high_resolution_clock::now();
+		auto start_comm6 = std::chrono::high_resolution_clock::now();
 
 		vector<shared_ptr<AsymmetricCiphertext>> B_enc2 = recv_vec_enc();
 
-		auto end_comm5 = std::chrono::high_resolution_clock::now();
+		auto end_comm6 = std::chrono::high_resolution_clock::now();
 
 		//Engage in ZK-proof with server to check that [B] is a correct decryption of [[B]] under sk_sk
 		//TODO don't forget to include the [[B]] that we computed previously here
 
+		auto start_ver_D1 = std::chrono::high_resolution_clock::now();
+
+		bool D1_ver = verify_D1(40, B_enc2, B_enc);
+
+		auto end_ver_D1 = std::chrono::high_resolution_clock::now();
+
+		cout << "D1 verified: " << D1_ver << endl;
+
 		//Fully decrypt [B]
-		auto start_dec = std::chrono::high_resolution_clock::now();
+		auto start_D2 = std::chrono::high_resolution_clock::now();
 
 		vector<shared_ptr<GroupElement>> B = decrypt_B_enc2(B_enc2);
 
-		auto end_dec = std::chrono::high_resolution_clock::now();
+		auto end_D2 = std::chrono::high_resolution_clock::now();
+
+		cout << "B = D2([B])" << endl;
 
 		//Check if one of the decryptions yields a valid key
 		auto start_check = std::chrono::high_resolution_clock::now();
@@ -834,27 +978,37 @@ int Sensor::main_mal() {
 		auto time_capture = chrono::duration_cast<chrono::microseconds>(end_capture - start_capture).count();
 		auto time_ver_sig = chrono::duration_cast<chrono::microseconds>(end_ver_sig - start_ver_sig).count();
 		auto time_lookup = chrono::duration_cast<chrono::microseconds>(end_lookup - start_lookup).count();
+		auto time_add_scores = chrono::duration_cast<chrono::microseconds>(end_add_scores - start_add_scores).count();
+		auto time_ver_compare = chrono::duration_cast<chrono::microseconds>(end_ver_compare - start_ver_compare).count();
 		auto time_ver_permute = chrono::duration_cast<chrono::microseconds>(end_ver_permute - start_ver_permute).count();
-		auto time_dec = chrono::duration_cast<chrono::microseconds>(end_dec - start_dec).count();
+		auto time_B = chrono::duration_cast<chrono::microseconds>(end_B - start_B).count();
+		auto time_ver_D1 = chrono::duration_cast<chrono::microseconds>(end_ver_D1 - start_ver_D1).count();
+		auto time_D2 = chrono::duration_cast<chrono::microseconds>(end_D2 - start_D2).count();
 		auto time_check = chrono::duration_cast<chrono::microseconds>(end_check - start_check).count();
-		auto time_comm = chrono::duration_cast<chrono::microseconds>(end_comm1 - start_comm1 + end_comm2 - start_comm2 + end_comm3 - start_comm3 + end_comm4 - start_comm4 + end_comm5 - start_comm5).count();
-		auto time_total = time_setup + time_enroll + time_sig + time_capture + time_ver_sig + time_lookup + time_ver_permute + time_dec + time_check + time_comm;
+		auto time_comm = chrono::duration_cast<chrono::microseconds>(end_comm1 - start_comm1 + end_comm2 - start_comm2 + end_comm3 - start_comm3 + end_comm4 - start_comm4 + end_comm5 - start_comm5 + end_comm6 - start_comm6).count();
+
+		auto time_total = time_setup + time_enroll + time_sig + time_capture + time_ver_sig + time_lookup + time_add_scores + time_ver_compare + time_ver_permute + time_B + time_ver_D1 + time_D2 + time_check + time_comm;
+		auto time_alpha = time_ver_compare + time_ver_permute + time_B + time_ver_D1 + time_D2 + time_check;
 
 		cout << endl;
 		cout << "Elapsed time in us: " << endl;
 		cout << "Shared key setup: " << time_setup << endl;
 		cout << "Create enrollment: " << time_enroll << endl;
-		cout << "Signature verification: " << time_sig << endl;
+		cout << "Create signature: " << time_sig << endl;
 		cout << "Capture: " << time_capture << endl;
 		cout << "Verification signatures: " << time_ver_sig << endl;
 		cout << "Lookup: " << time_lookup << endl;
-		cout << "Verify permutation: " << time_ver_permute << endl;
-		cout << "Decryption of [B]: " << time_dec << endl;
+		cout << "Addition of partial similarity scores: " << time_add_scores << endl;
+		cout << "Verification permutation: " << time_ver_permute << endl;
+		cout << "[[C]]+[[k]]: " << time_B << endl;
+		cout << "Verification partial decryption: " << time_ver_D1 << endl;
+		cout << "Decryption of [B]: " << time_D2 << endl;
 		cout << "Key check: " << time_check << endl;
 		cout << "Total communication overhead: " << time_comm << endl;
 		cout << endl;
 		cout << "Total elapsed time in us: " << time_total << endl;
-		cout << "Percentage verify permutation / total server: " << (double) time_ver_permute / time_total << endl;
+		cout << "Percentage verify permutation / total server: " << (double) time_ver_permute / time_total << endl << endl;
+		cout << "Total elapsed time in us for alpha: " << time_alpha << endl;
 		
 		io_service.stop();
 		th.join();

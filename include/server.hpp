@@ -30,9 +30,11 @@ public:
 
 	shared_ptr<GroupElement> fetch_y(int u);
 
-	vector<shared_ptr<AsymmetricCiphertext>> compare_mal(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S);
+	tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>> compare_mal(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S);
 
 	vector<shared_ptr<AsymmetricCiphertext>> compare(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S);
+
+	void prove_compare(vector<biginteger> r, vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime_prime);
 
 	tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>, vector<vector<int>>> permute(vector<shared_ptr<AsymmetricCiphertext>> C_enc);
 
@@ -43,6 +45,8 @@ public:
 	pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> fetch_key_pair(int u);
 
 	vector<shared_ptr<AsymmetricCiphertext>> D1(vector<shared_ptr<AsymmetricCiphertext>> B_enc);
+
+	void prove_D1(vector<shared_ptr<AsymmetricCiphertext>> B_enc2, vector<shared_ptr<AsymmetricCiphertext>> B_enc);
 
 	int size_table();
 
@@ -57,8 +61,6 @@ public:
 	int usage();
 
 	int main_sh();
-
-	void test();
 
 	int main_mal();
 };

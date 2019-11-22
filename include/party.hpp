@@ -39,13 +39,14 @@ protected:
   shared_ptr<PublicKey> pk_own;
   shared_ptr<PrivateKey> sk_own;
   shared_ptr<PublicKey> pk_shared;
+  shared_ptr<PublicKey> pk_other;
 
   //Protocol parameters
   const pair<int, int> template_size = make_pair(3,4); //assert sqrt(template_size.second) == integer
   const int min_s = 0;
   const int max_s = 10;
   const biginteger max_S = template_size.first * max_s;
-  const biginteger t = max_S / 5 * 4; //threshold
+  const biginteger t = max_S - 10; //threshold
 
 public:
   void pad(vector<unsigned char> &input, int bytes);
@@ -108,25 +109,37 @@ public:
 
   vector<shared_ptr<AsymmetricCiphertext>> calc_B_enc(vector<shared_ptr<AsymmetricCiphertext>> C_enc2, shared_ptr<AsymmetricCiphertext> K_enc2);
 
-  int bct_p1();
+  void zkpk_prove(biginteger x, vector<shared_ptr<GroupElement>> y, vector<shared_ptr<GroupElement>> bases);
 
-  int bct_p2();
+  bool zkpk_verify(int k, vector<shared_ptr<GroupElement>> y, vector<shared_ptr<GroupElement>> bases);
+
+  void zkpk_prove_with_com(pair<biginteger, biginteger> x, vector<shared_ptr<GroupElement>> y, vector<shared_ptr<GroupElement>> bases);
+
+  bool zkpk_verify_with_com(int m, vector<shared_ptr<GroupElement>> y, vector<shared_ptr<GroupElement>> bases);
+
+  int bct_bit_p1();
+
+  biginteger bct_p1();
+
+  int bct_bit_p2();
+
+  biginteger bct_p2();
 
   void ac_p1(shared_ptr<CmtWithProofsCommitter> committer, biginteger x, biginteger r, long id_x_r, string x_name, string r_name);
 
   void ac_p1(shared_ptr<CmtWithProofsCommitter> committer, biginteger x, long id_x_r, string x_name);
 
-  pair<shared_ptr<CmtRCommitPhaseOutput>, shared_ptr<CmtCommitValue>> ac_p2(shared_ptr<CmtWithProofsReceiver> receiver, long id_x_r, string x_name, string r_name);
+  pair<shared_ptr<CmtCCommitmentMsg>, shared_ptr<CmtCommitValue>> ac_p2(shared_ptr<CmtWithProofsReceiver> receiver, long id_x_r, string x_name, string r_name);
 
-  pair<shared_ptr<CmtRCommitPhaseOutput>, shared_ptr<CmtCommitValue>> ac_p2(shared_ptr<CmtWithProofsReceiver> receiver, long id_x_r, string x_name);
+  pair<shared_ptr<CmtCCommitmentMsg>, shared_ptr<CmtCommitValue>> ac_p2(shared_ptr<CmtWithProofsReceiver> receiver, long id_x_r, string x_name);
 
   pair<biginteger, biginteger> act_p1(int n, int l);
 
-  shared_ptr<CmtRCommitPhaseOutput> act_p2(int n, int l);
+  shared_ptr<CmtCCommitmentMsg> act_p2(int n, int l);
 
   biginteger ic_p1(biginteger x);
 
-  shared_ptr<CmtRCommitPhaseOutput> ic_p2();
+  shared_ptr<CmtCCommitmentMsg> ic_p2();
 };
 
 #endif
