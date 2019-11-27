@@ -26,8 +26,6 @@ void Party::pad(vector<unsigned char> &input, int bits) {
 void Party::key_setup(shared_ptr<PublicKey> pk_other) {
 	shared_ptr<GroupElement> h_shared = dlog->exponentiate(((ElGamalPublicKey*) pk_other.get())->getH().get(), ((ElGamalPrivateKey*) sk_own.get())->getX());
 
-	cout << "h_shared: " << ((OpenSSLZpSafePrimeElement *)h_shared.get())->getElementValue() << endl;
-
 	pk_shared = make_shared<ElGamalPublicKey>(ElGamalPublicKey(h_shared));
 
 	elgamal->setKey(pk_shared);
@@ -190,16 +188,13 @@ shared_ptr<GroupElement> Party::recv_group_element() {
 *	Receive public key from other party
 */
 shared_ptr<PublicKey> Party::recv_pk() {
-  shared_ptr<PublicKey> pk_sv;
+	shared_ptr<PublicKey> pk_sv;
 
-  shared_ptr<KeySendableData> pk_sv_sendable = make_shared<ElGamalPublicKeySendableData>(dlog->getGenerator()->generateSendableData());
-  vector<byte> raw_msg;
-  channel->readWithSizeIntoVector(raw_msg);
-  pk_sv_sendable->initFromByteVector(raw_msg);
-  pk_sv = elgamal->reconstructPublicKey(pk_sv_sendable.get());
-
-  shared_ptr<GroupElement> h = ((ElGamalPublicKey*) pk_sv.get())->getH();
-  cout << "h: " << ((OpenSSLZpSafePrimeElement *)h.get())->getElementValue() << endl;
+	shared_ptr<KeySendableData> pk_sv_sendable = make_shared<ElGamalPublicKeySendableData>(dlog->getGenerator()->generateSendableData());
+	vector<byte> raw_msg;
+	channel->readWithSizeIntoVector(raw_msg);
+	pk_sv_sendable->initFromByteVector(raw_msg);
+	pk_sv = elgamal->reconstructPublicKey(pk_sv_sendable.get());
 
 	return pk_sv;
 }
@@ -317,8 +312,18 @@ Signature Party::recv_signature() {
 	return sig;
 }
 
+/*
+*	Generate random bit
+*/
 biginteger Party::random_bit() {
 	return getRandomInRange(0, 1, get_seeded_prg().get());
+}
+
+/*
+*	Abort the protocol
+*/
+void Party::abort_protocol() {
+	exit(1);
 }
 
 /*
@@ -396,7 +401,7 @@ vector<shared_ptr<AsymmetricCiphertext>> Party::calc_B_enc(vector<shared_ptr<Asy
 
 /*
 *	Sigma protocol proof
-*	Used in Equality of exponents proof
+*	quality of exponents proof of Step 26
 */
 void Party::zkpk_prove(biginteger x, vector<shared_ptr<GroupElement>> y, vector<shared_ptr<GroupElement>> bases) {
 	biginteger q = dlog->getOrder();
@@ -426,7 +431,7 @@ void Party::zkpk_prove(biginteger x, vector<shared_ptr<GroupElement>> y, vector<
 
 /*
 *	Sigma protocol verification
-*	Used in Equality of exponents proof
+*	Equality of exponents proof of Step 26
 */
 bool Party::zkpk_verify(int k, vector<shared_ptr<GroupElement>> y, vector<shared_ptr<GroupElement>> bases) {
 	bool result = true;
@@ -454,7 +459,7 @@ bool Party::zkpk_verify(int k, vector<shared_ptr<GroupElement>> y, vector<shared
 
 /*
 *	Sigma protocol proof
-*	Used in Equality of exponents proof
+*	Equality of exponents proof of Step 16-18 in partially key release protocol
 */
 void Party::zkpk_prove_with_com(pair<biginteger, biginteger> x, vector<shared_ptr<GroupElement>> y, vector<shared_ptr<GroupElement>> bases) {
 	biginteger q = dlog->getOrder();
@@ -468,7 +473,7 @@ void Party::zkpk_prove_with_com(pair<biginteger, biginteger> x, vector<shared_pt
 	//Compute t1 = g^k1, t2 = h^k1, t3 = g^k2 h^k1
 	t.push_back(dlog->exponentiate(bases[0].get(), k1));
 	t.push_back(dlog->exponentiate(bases[1].get(), k1));
-	t.push_back(dlog->multiplyGroupElements(dlog->exponentiate(bases[2].get(), k2).get(), dlog->exponentiate(bases[3].get(), k1));
+	t.push_back(dlog->multiplyGroupElements(dlog->exponentiate(bases[2].get(), k2).get(), dlog->exponentiate(bases[3].get(), k1).get()));
 
 	//Send t1, t2, t3 to verifier
 	send_vec_group_element(t);
@@ -487,19 +492,18 @@ void Party::zkpk_prove_with_com(pair<biginteger, biginteger> x, vector<shared_pt
 
 /*
 *	Sigma protocol verification
-*	Used in Equality of exponents proof
+*	Equality of exponents proof of Step 16-18 in partially malicious key release protocol
 */
 bool Party::zkpk_verify_with_com(int m, vector<shared_ptr<GroupElement>> y, vector<shared_ptr<GroupElement>> bases) {
-	bool result = false;
-
-	//Receive t1, t2, ... from prover
+	//Receive t1, t2, t3 from prover
 	vector<shared_ptr<GroupElement>> t = recv_vec_group_element();
 
-	//Choose challenge c \in_R {0,1}^k
-	biginteger c = random_bitstring(k);
+	//Choose challenge c \in_R {0,1}^m
+	biginteger c = mod(random_bitstring(m), dlog->getOrder());
 
 	//Send challenge to prover
 	send_biginteger(c);
+
 
 	//Receive response from prover
 	vector<biginteger> s = recv_vec_biginteger();
@@ -508,11 +512,6 @@ bool Party::zkpk_verify_with_com(int m, vector<shared_ptr<GroupElement>> y, vect
 	auto left0 = dlog->multiplyGroupElements(dlog->exponentiate(bases[0].get(), s[0]).get(), dlog->exponentiate(y[0].get(), c).get());
 	auto left1 = dlog->multiplyGroupElements(dlog->exponentiate(bases[1].get(), s[0]).get(), dlog->exponentiate(y[1].get(), c).get());
 	auto left2 = dlog->multiplyGroupElements(dlog->multiplyGroupElements(dlog->exponentiate(bases[2].get(), s[1]).get(), dlog->exponentiate(bases[3].get(), s[0]).get()).get(), dlog->exponentiate(y[2].get(), c).get());
-
-	for (int i = 0; i < bases.size(); i++) {
-		auto left = 
-		result = (result && );
-	}
 
 	return (*left0.get() == *t[0].get()) && (*left1.get() == *t[1].get()) && (*left2.get() == *t[2].get());
 }
@@ -668,12 +667,11 @@ biginteger Party::bct_p2() {
 void Party::ac_p1(shared_ptr<CmtWithProofsCommitter> committer, biginteger x, biginteger r, long id_x_r, string x_name, string r_name) {
 	//compute commitment over x using randomness r and perform ZKPOK to prove knowledge of x
 	shared_ptr<CmtCommitValue> com_x = make_shared<CmtBigIntegerCommitValue>(make_shared<biginteger>(x));
-	cout << "committing on " << x_name << " using random-tape " << r_name << "..." << endl;
+	//cout << "committing on " << x_name << " using random-tape " << r_name << "..." << endl;
 	committer->commit(com_x, r, id_x_r);
-	committer->decommit(id_x_r);
 
 	//prove knowledge on com(x,r)
-	cout << "proving knowledge on com(" << x_name << "," << r_name << ")..." << endl;
+	//cout << "proving knowledge on com(" << x_name << "," << r_name << ")..." << endl;
 	committer->proveKnowledge(id_x_r);
 }
 
@@ -686,46 +684,39 @@ void Party::ac_p1(shared_ptr<CmtWithProofsCommitter> committer, biginteger x, lo
 /*
 *	Authenticated Computation protocol for party 2
 */
-pair<shared_ptr<CmtCCommitmentMsg>, shared_ptr<CmtCommitValue>> Party::ac_p2(shared_ptr<CmtWithProofsReceiver> receiver, long id_x_r, string x_name, string r_name) {
+shared_ptr<CmtCCommitmentMsg> Party::ac_p2(shared_ptr<CmtWithProofsReceiver> receiver, long id_x_r, string x_name, string r_name) {
 	//receive commitment over r' from p1
 	auto com_x = receiver->receiveCommitment();
-	auto result_x_r = receiver->receiveDecommitment(id_x_r); //TODO maybe remove this, p2 should not be able to see the decommitment
-	if (result_x_r == NULL) {
-		cout << "commitment of " << x_name << " using randomness " << r_name << " failed" << endl;
-	}
-	else {
-		cout << "succesfully obtained commitment over " << x_name << " using randomness " << r_name << endl;
-		cout << x_name << ": " << result_x_r->toString() << endl;
-	}
 
 	//verify zkpof over commitment of r
-	cout << "ZKPOF on com(" << x_name << "," << r_name << ") accepted: " << receiver->verifyKnowledge(id_x_r) << endl;
+	bool verified = receiver->verifyKnowledge(id_x_r);
+	//cout << "ZKPOF on com(" << x_name << "," << r_name << ") accepted: " << verified << endl;
 
 	shared_ptr<CmtPedersenCommitmentMessage> com_x_pedersen = static_pointer_cast<CmtPedersenCommitmentMessage>(receiver->CmtReceiver::getCommitmentPhaseValues(com_x->getCommitmentId()));
 
-	return make_pair(com_x_pedersen, result_x_r);
+	return com_x_pedersen;
 }
 
-pair<shared_ptr<CmtCCommitmentMsg>, shared_ptr<CmtCommitValue>> Party::ac_p2(shared_ptr<CmtWithProofsReceiver> receiver, long id_x_r, string x_name) {
+shared_ptr<CmtCCommitmentMsg> Party::ac_p2(shared_ptr<CmtWithProofsReceiver> receiver, long id_x_r, string x_name) {
 	return ac_p2(receiver, id_x_r, x_name, "-random-");
 }
 
 /*
 *	Augmented Coin Tossing for party 1
 */
-pair<biginteger, biginteger> Party::act_p1(int n, int l) {
-	cout << "------------AUGMENTED COIN TOSSING FOR P1-----------" << endl;
-
-	shared_ptr<CmtWithProofsCommitter> committer = make_shared<CmtPedersenWithProofsCommitter>(channel, 40, dlog);
+tuple<biginteger, biginteger, shared_ptr<GroupElement>> Party::act_p1(shared_ptr<CmtWithProofsCommitter> committer, int n, int l) {
+	//cout << "------------AUGMENTED COIN TOSSING FOR P1-----------" << endl;
 
 	biginteger q = dlog->getOrder();
 
 	//select r' = \sigma_1,...,\sigma_l \in (0,1) and s=s_1,...,s_l \in (0,1)^n
-	biginteger r_acc = random_bitstring(l);
-	cout << "r': " << r_acc << endl;
-
-	biginteger s = random_bitstring(n*l);
-	cout << "s: " << s << endl;
+	//biginteger r_acc = mod(random_bitstring(l), q);
+	biginteger r_acc = getRandomInRange(0, q - 1, get_seeded_prg().get());
+	//cout << "r': " << r_acc << endl;
+	
+	//biginteger s = mod(random_bitstring(n*l), q);
+	biginteger s = getRandomInRange(0, q - 1, get_seeded_prg().get());
+	//cout << "s: " << s << endl;
 
 	long id_r_acc_s = 0;
 
@@ -740,34 +731,34 @@ pair<biginteger, biginteger> Party::act_p1(int n, int l) {
 		r_acc2 = r_acc2 + ((biginteger)b) * ((biginteger)pow(2, l - i - 1));
 	}
 
-	cout << "obtained r'' through BCT: " << r_acc2 << endl;
+	//cout << "obtained r'' through BCT: " << r_acc2 << endl;
 
 	//generate r = r' xor r''
 	biginteger r = r_acc ^ r_acc2;
 
-	cout << "compute r = r' xor r'': " << r << endl;
+	//cout << "compute r = r' xor r'': " << r << endl;
 
 	//compute commitment over r and send to p2 using authenticated computation protocol
 	long id_r = 1;
 	ac_p1(committer, r, id_r, "r");
 
-	cout << "----------------------------------------------------" << endl;
+	//cout << "----------------------------------------------------" << endl;
 
 	biginteger randomtape = static_pointer_cast<BigIntegerRandomValue>(committer->getCommitmentPhaseValues(id_r)->getR())->getR();
 
-	return make_pair(r, randomtape);
+	auto com_r_pedersen = static_pointer_cast<GroupElement>(committer->getCommitmentPhaseValues(id_r)->getComputedCommitment());
+
+	return make_tuple(r, randomtape, com_r_pedersen);
 }
 
 /*
 *	Augmented Coin Tossing for party 2
 */
-shared_ptr<CmtCCommitmentMsg> Party::act_p2(int n, int l) {
-	cout << "------------AUGMENTED COIN TOSSING FOR P2-----------" << endl;
-
-	shared_ptr<CmtWithProofsReceiver> receiver = make_shared<CmtPedersenWithProofsReceiver>(channel, 40, dlog);
+shared_ptr<CmtCCommitmentMsg> Party::act_p2(shared_ptr<CmtWithProofsReceiver> receiver, int n, int l) {
+	//cout << "------------AUGMENTED COIN TOSSING FOR P2-----------" << endl;
 
 	long id_r_acc_s = 0;
-	pair<shared_ptr<CmtCCommitmentMsg>, shared_ptr<CmtCommitValue>> com_r_acc_s = ac_p2(receiver, id_r_acc_s, "r'", "s");
+	shared_ptr<CmtCCommitmentMsg> com_r_acc_s = ac_p2(receiver, id_r_acc_s, "r'", "s");
 
 	//p1 and p2 engage in BCT protocol l times to generate r_acc2
 	biginteger r_acc2;
@@ -777,71 +768,13 @@ shared_ptr<CmtCCommitmentMsg> Party::act_p2(int n, int l) {
 		r_acc2 = r_acc2 + ((biginteger)b) * ((biginteger)pow(2, l - i - 1));
 	}
 
-	cout << "obtained r'' through BCT: " << r_acc2 << endl;
+	//cout << "obtained r'' through BCT: " << r_acc2 << endl;
 
 	//receive commitment over r from p1 and verify knowledge
 	long id_r = 1;
-	pair<shared_ptr<CmtCCommitmentMsg>, shared_ptr<CmtCommitValue>> com_r_result_r = ac_p2(receiver, id_r, "r");
+	shared_ptr<CmtCCommitmentMsg> com_r = ac_p2(receiver, id_r, "r");
 
-	cout << "----------------------------------------------------" << endl;
+	//cout << "----------------------------------------------------" << endl;
 
-	return com_r_result_r.first;
-}
-
-/*
-*	Input Commitment protocol for party 1
-*/
-biginteger Party::ic_p1(biginteger x) {
-	cout << "------------INPUT COMMITMENT FOR P1-----------------" << endl;
-
-	cout << "entering protocol with input x: " << x << endl;
-
-	shared_ptr<CmtWithProofsCommitter> committer = make_shared<CmtPedersenWithProofsCommitter>(channel, 40, dlog);
-
-	//compute commitment over x and perform ZKPOF on com(x,r')
-	cout << "number of bits:" << NumberOfBits(x) << endl;
-	int n = NumberOfBits(x);
-	cout << "n^2: " << pow(n, 2) << endl;
-	biginteger r_acc = random_bitstring(pow(n, 2));
-	long id_x_r_acc = 0;
-
-	ac_p1(committer, x, r_acc, id_x_r_acc, "x", "r'");
-
-	//perform augmented coin tossing protocol to obtain output (r, r'')
-	pair<biginteger, biginteger> r_r_acc2 = act_p1(pow(n, 2), n);
-	biginteger r = r_r_acc2.first;
-	biginteger r_acc2 = r_r_acc2.second;
-
-	//compute com(x,r) and send to p2 using authenticated computation protocol
-	long id_x_r = 1;
-	ac_p1(committer, x, r, id_x_r, "x", "r");
-
-	cout << "----------------------------------------------------" << endl;
-
-	return r;
-}
-
-/*
-*	Input Commitment protocol for party 2
-*/
-shared_ptr<CmtCCommitmentMsg> Party::ic_p2() {
-	cout << "------------INPUT COMMITMENT FOR P2-----------------" << endl;
-
-	shared_ptr<CmtWithProofsReceiver> receiver = make_shared<CmtPedersenWithProofsReceiver>(channel, 40, dlog);
-
-	//receive commitment over x from p1 using authenticated computation protocol
-	long id_x_r_acc = 0;
-	pair<shared_ptr<CmtCCommitmentMsg>, shared_ptr<CmtCommitValue>> com_x_r_acc_result_x_r_acc = ac_p2(receiver, id_x_r_acc, "x", "r'");
-	auto com_x_r_acc = com_x_r_acc_result_x_r_acc.first;
-	auto result_x_r_acc = com_x_r_acc_result_x_r_acc.second;
-
-	//perform augmented coin tossing protocol to obtain output c'' = com(r, r'')
-	int n = NumberOfBits(*((biginteger*) result_x_r_acc->getX().get()));
-	auto com_r_r_acc = act_p2(pow(2, n), n);
-
-	//receive com(x,r) from p1 using authenticated computation protocol
-	long id_x_r = 1;
-	auto com_x_r = ac_p2(receiver, id_x_r, "x", "r");
-
-	cout << "----------------------------------------------------" << endl;
+	return com_r;
 }

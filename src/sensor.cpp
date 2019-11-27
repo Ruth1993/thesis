@@ -221,11 +221,10 @@ shared_ptr<AsymmetricCiphertext> Sensor::add_scores(vector<shared_ptr<Asymmetric
 /*
 *	
 */
-pair<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<CmtCCommitmentMsg>>> Sensor::compare_mal(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S) {
+tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<CmtCCommitmentMsg>>, vector<shared_ptr<GroupElement>>> Sensor::compare_mal(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S) {
 	vector<shared_ptr<AsymmetricCiphertext>> C_enc_no_r_ss;
 	vector<shared_ptr<CmtCCommitmentMsg>> commitments_r;
-
-	elgamal->setKey(pk_shared);
+	vector<shared_ptr<GroupElement>> h;
 
 	auto g = dlog->getGenerator();
 	biginteger q = dlog->getOrder();
@@ -234,7 +233,6 @@ pair<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<CmtCCommitmentM
 
 	for (int i = 0; i <= j; i++) {
 		biginteger x = bct_p2();
-		cout << "x_" << i << ": " << x << endl;
 
 		//compute g^(-t-i)
 		biginteger min_t_min_i = q - t - i;
@@ -251,23 +249,28 @@ pair<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<CmtCCommitmentM
 		C_enc_no_r_ss.push_back(result);
 
 		//Perform Augmented Coin Tossing to obtain Com(r)
-		auto com_r = act_p2(2, 6);
+		shared_ptr<CmtWithProofsReceiver> receiver = make_shared<CmtPedersenWithProofsReceiver>(channel, 40, dlog);
+		auto com_r = act_p2(receiver, 2, 6);
+
+		//save h which is used for Pedersen commitment in vector h
+		h.push_back(static_pointer_cast<GroupElement>(receiver->getPreProcessedValues().back()));
 
 		commitments_r.push_back(com_r);
 	}
 
-	return make_pair(C_enc_no_r_ss, commitments_r);
+	return make_tuple(C_enc_no_r_ss, commitments_r, h);
 }
 
-bool Sensor::verify_compare(int soundness, vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_no_r_ss, vector<shared_ptr<CmtCCommitmentMsg>> commitments_r) {
-
+bool Sensor::verify_compare(int soundness, vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_no_r_ss, vector<shared_ptr<CmtCCommitmentMsg>> commitments_r, vector<shared_ptr<GroupElement>> h) {
 	bool result = true;
 	
 	for (int i = 0; i <= (max_S-t); i++) {
 		auto com_r_pedersen = dynamic_cast<CmtPedersenCommitmentMessage*>(commitments_r[i].get());
+
 		if (com_r_pedersen == NULL) {
 			throw invalid_argument("The received message should be an instance of CmtPedersenCommitmentMessage");
 		}
+
 		auto cmt = commitments_r[i]->getCommitment();
 		auto ge = static_pointer_cast<GroupElementSendableData>(cmt);
 
@@ -284,11 +287,16 @@ bool Sensor::verify_compare(int soundness, vector<shared_ptr<AsymmetricCiphertex
 	
 		c.push_back(c1);
 		c.push_back(c2);
+		c.push_back(com_r_element);
 
 		c_prime_prime.push_back(c1_prime_prime);
 		c_prime_prime.push_back(c2_prime_prime);
+		c_prime_prime.push_back(dlog->getGenerator());
+		c_prime_prime.push_back(h[i]);
 
-		result = (result && zkpk_verify(soundness, c, c_prime_prime));
+		bool verify = zkpk_verify_with_com(soundness, c, c_prime_prime);
+
+		result = (result && verify);
 	}
 	
 	return result;
@@ -816,8 +824,6 @@ int Sensor::main_mal() {
 		send_signature(sig_n_enroll); //send \sigma(n)
 		send_group_element(signer->y); //send public key y
 
-		cout << "y: " << ((OpenSSLZpSafePrimeElement*)signer->y.get())->getElementValue() << endl;
-
 		auto end_comm1 = std::chrono::high_resolution_clock::now();
 
 		//Capture (u, vec(p))
@@ -885,26 +891,24 @@ int Sensor::main_mal() {
 
 		//Compute [[C'']] ([[C]] without blinding factors r) itself
 
-		pair<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<CmtCCommitmentMsg>>> comparison_malicious = compare_mal(S_enc, t, max_S);
-		vector<shared_ptr<AsymmetricCiphertext>> C_enc_no_r_ss = comparison_malicious.first;
-		vector<shared_ptr<CmtCCommitmentMsg>> commitments_r = comparison_malicious.second;
-
-		cout << "size : " << C_enc_no_r_ss.size() << endl;
-		cout << "size : " << commitments_r.size() << endl;
+		tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<CmtCCommitmentMsg>>, vector<shared_ptr<GroupElement>>> comparison_malicious = compare_mal(S_enc, t, max_S);
+		vector<shared_ptr<AsymmetricCiphertext>> C_enc_no_r_ss = get<0>(comparison_malicious);
+		vector<shared_ptr<CmtCCommitmentMsg>> commitments_r = get<1>(comparison_malicious);
+		vector<shared_ptr<GroupElement>> h = get<2>(comparison_malicious);
 
 		//Receive [[C]] from server
 		auto start_comm4 = std::chrono::high_resolution_clock::now();
 
 		vector<shared_ptr<AsymmetricCiphertext>> C_enc = recv_vec_enc();
 
-		cout << "C_enc received" << endl;
-
 		auto end_comm4 = std::chrono::high_resolution_clock::now();
+
+		cout << "C_enc received" << endl;
 
 		//Verify comparison
 		auto start_ver_compare = std::chrono::high_resolution_clock::now();
 
-		bool compare_ver = verify_compare(40, C_enc, C_enc_no_r_ss, commitments_r);
+		bool compare_ver = verify_compare(40, C_enc, C_enc_no_r_ss, commitments_r, h);
 
 		auto end_ver_compare = std::chrono::high_resolution_clock::now();
 
@@ -943,7 +947,6 @@ int Sensor::main_mal() {
 		auto end_comm6 = std::chrono::high_resolution_clock::now();
 
 		//Engage in ZK-proof with server to check that [B] is a correct decryption of [[B]] under sk_sk
-		//TODO don't forget to include the [[B]] that we computed previously here
 
 		auto start_ver_D1 = std::chrono::high_resolution_clock::now();
 

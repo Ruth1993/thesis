@@ -34,9 +34,9 @@ public:
 
 	shared_ptr<AsymmetricCiphertext> add_scores(vector<shared_ptr<AsymmetricCiphertext>> vec_s_enc);
 
-	pair<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<CmtCCommitmentMsg>>> compare_mal(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S);
+	tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<CmtCCommitmentMsg>>, vector<shared_ptr<GroupElement>>> compare_mal(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S);
 
-	bool verify_compare(int soundness, vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_no_r_ss, vector<shared_ptr<CmtCCommitmentMsg>> commitments_r);
+	bool verify_compare(int soundness, vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_no_r_ss, vector<shared_ptr<CmtCCommitmentMsg>> commitments_r, vector<shared_ptr<GroupElement>> h);
 
 	bool verify_permutation(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime);
 

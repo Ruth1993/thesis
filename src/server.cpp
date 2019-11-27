@@ -86,12 +86,13 @@ shared_ptr<GroupElement> Server::fetch_y(int u) {
 /*
 *
 */
-tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>> Server::compare_mal(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S) {
+tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<AsymmetricCiphertext>>, tuple<vector<biginteger>, vector<biginteger>, pair<vector<shared_ptr<GroupElement>>, vector<shared_ptr<GroupElement>>>>> Server::compare_mal(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S) {
 	vector<shared_ptr<AsymmetricCiphertext>> C_enc;
 	vector<shared_ptr<AsymmetricCiphertext>> C_enc_no_r_sv;
-	vector<biginteger> blind_vals;
-
-	elgamal->setKey(pk_shared);
+	vector<biginteger> blind_values;
+	vector<biginteger> blind_randomness;
+	vector<shared_ptr<GroupElement>> commitments;
+	vector<shared_ptr<GroupElement>> h;
 
 	auto g = dlog->getGenerator();
 	biginteger q = dlog->getOrder();
@@ -99,6 +100,7 @@ tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<AsymmetricCiph
 	biginteger j = max_S - t;
 
 	for (int i = 0; i <= j; i++) {
+		//engage in basic coin tossing to generate x which is used as randomness for the ElGamal encryption of S-t-i
 		biginteger x = bct_p1();
 
 		//compute g^(-t-i)
@@ -116,9 +118,16 @@ tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<AsymmetricCiph
 		C_enc_no_r_sv.push_back(result);
 
 		//finally blind result with r obtained by the Augmented Coin Tossing protocol
-		pair<biginteger, biginteger> acointoss = act_p1(2,6);
-		biginteger r = acointoss.first;
-		blind_vals.push_back(r);
+		shared_ptr<CmtWithProofsCommitter> committer = make_shared<CmtPedersenWithProofsCommitter>(channel, 40, dlog);
+		tuple<biginteger, biginteger, shared_ptr<GroupElement>> acointoss = act_p1(committer, 2,6);
+		biginteger r = get<0>(acointoss);
+		biginteger rho = get<1>(acointoss);
+		shared_ptr<GroupElement> com_r = get<2>(acointoss);
+
+		blind_values.push_back(r);
+		blind_randomness.push_back(rho);
+		commitments.push_back(com_r);
+		h.push_back(static_pointer_cast<GroupElement>(committer->getPreProcessValues().back()));
 
 		auto c1 = ((ElGamalOnGroupElementCiphertext*)result.get())->getC1();
 		auto c2 = ((ElGamalOnGroupElementCiphertext*)result.get())->getC2();
@@ -132,14 +141,13 @@ tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<AsymmetricCiph
 		C_enc.push_back(result_blind);
 	}
 
-	return make_tuple(C_enc, C_enc_no_r_sv, blind_vals);
+	return make_tuple(C_enc, C_enc_no_r_sv, make_tuple(blind_values, blind_randomness, make_pair(commitments, h)));
 }
 
 /*
 *	Prove correctness of comparison operation
 */
-void Server::prove_compare(vector<biginteger> r, vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime_prime) {
-
+void Server::prove_compare(vector<biginteger> r, vector<biginteger> rho, vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime_prime, vector<shared_ptr<GroupElement>> commitments_r, vector<shared_ptr<GroupElement>> h) {
 	for (int i = 0; i <= max_S - t; i++) {
 		vector<shared_ptr<GroupElement>> c;
 		vector<shared_ptr<GroupElement>> c_prime_prime;
@@ -152,16 +160,15 @@ void Server::prove_compare(vector<biginteger> r, vector<shared_ptr<AsymmetricCip
 
 		c.push_back(c1);
 		c.push_back(c2);
+		c.push_back(commitments_r[i]);
 
 		c_prime_prime.push_back(c1_prime_prime);
 		c_prime_prime.push_back(c2_prime_prime);
+		c_prime_prime.push_back(dlog->getGenerator());
+		c_prime_prime.push_back(h[i]);
 
-		//add com(r), etc
-
-		zkpk_prove(r[i], c, c_prime_prime);
+		zkpk_prove_with_com(make_pair(r[i], rho[i]), c, c_prime_prime);
 	}
-
-
 }
 
 /*
@@ -828,10 +835,13 @@ int Server::main_mal() {
 		//Compare [[S]] with t
 		auto start_compare = std::chrono::high_resolution_clock::now();
 
-		tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>> comparison_malicious = compare_mal(S_enc, t, max_S);
+		tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<AsymmetricCiphertext>>, tuple<vector<biginteger>, vector<biginteger>, pair<vector<shared_ptr<GroupElement>>, vector<shared_ptr<GroupElement>>>>> comparison_malicious = compare_mal(S_enc, t, max_S);
 		vector<shared_ptr<AsymmetricCiphertext>> C_enc = get<0>(comparison_malicious);
 		vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime_prime = get<1>(comparison_malicious);
-		vector<biginteger> r = get<2>(comparison_malicious);
+		vector<biginteger> r = get<0>(get<2>(comparison_malicious));
+		vector<biginteger> rho = get<1>(get<2>(comparison_malicious));
+		vector<shared_ptr<GroupElement>> commitments = get<2>(get<2>(comparison_malicious)).first;
+		vector<shared_ptr<GroupElement>> h = get<2>(get<2>(comparison_malicious)).second;
 
 		auto end_compare = std::chrono::high_resolution_clock::now();
 
@@ -847,7 +857,7 @@ int Server::main_mal() {
 		//Prove comparison operation
 		auto start_prove_compare = std::chrono::high_resolution_clock::now();
 
-		prove_compare(r, C_enc, C_enc_prime_prime);
+		prove_compare(r, rho, C_enc, C_enc_prime_prime, commitments, h);
 
 		auto end_prove_compare = std::chrono::high_resolution_clock::now();
 

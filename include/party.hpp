@@ -101,6 +101,8 @@ public:
 
   biginteger random_bit();
 
+  void abort_protocol();
+
   biginteger random_bitstring(int bits);
 
   vector<byte> compute_m(int u, shared_ptr<Template_enc> T_enc);
@@ -129,17 +131,14 @@ public:
 
   void ac_p1(shared_ptr<CmtWithProofsCommitter> committer, biginteger x, long id_x_r, string x_name);
 
-  pair<shared_ptr<CmtCCommitmentMsg>, shared_ptr<CmtCommitValue>> ac_p2(shared_ptr<CmtWithProofsReceiver> receiver, long id_x_r, string x_name, string r_name);
+  shared_ptr<CmtCCommitmentMsg> ac_p2(shared_ptr<CmtWithProofsReceiver> receiver, long id_x_r, string x_name, string r_name);
 
-  pair<shared_ptr<CmtCCommitmentMsg>, shared_ptr<CmtCommitValue>> ac_p2(shared_ptr<CmtWithProofsReceiver> receiver, long id_x_r, string x_name);
+  shared_ptr<CmtCCommitmentMsg> ac_p2(shared_ptr<CmtWithProofsReceiver> receiver, long id_x_r, string x_name);
 
-  pair<biginteger, biginteger> act_p1(int n, int l);
+  tuple<biginteger, biginteger, shared_ptr<GroupElement>> act_p1(shared_ptr<CmtWithProofsCommitter> committer, int n, int l);
 
-  shared_ptr<CmtCCommitmentMsg> act_p2(int n, int l);
+  shared_ptr<CmtCCommitmentMsg> act_p2(shared_ptr<CmtWithProofsReceiver> receiver, int n, int l);
 
-  biginteger ic_p1(biginteger x);
-
-  shared_ptr<CmtCCommitmentMsg> ic_p2();
 };
 
 #endif

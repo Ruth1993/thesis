@@ -30,11 +30,11 @@ public:
 
 	shared_ptr<GroupElement> fetch_y(int u);
 
-	tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>> compare_mal(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S);
+	tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<AsymmetricCiphertext>>, tuple<vector<biginteger>, vector<biginteger>, pair<vector<shared_ptr<GroupElement>>, vector<shared_ptr<GroupElement>>>>> compare_mal(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S);
+
+	void prove_compare(vector<biginteger> r, vector<biginteger> rho, vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime_prime, vector<shared_ptr<GroupElement>> commitments_r, vector<shared_ptr<GroupElement>> h);
 
 	vector<shared_ptr<AsymmetricCiphertext>> compare(shared_ptr<AsymmetricCiphertext> S_enc, biginteger t, biginteger max_S);
-
-	void prove_compare(vector<biginteger> r, vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime_prime);
 
 	tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<biginteger>, vector<vector<int>>> permute(vector<shared_ptr<AsymmetricCiphertext>> C_enc);
 

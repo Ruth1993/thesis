@@ -46,7 +46,6 @@ Signature Signer::sign(vector<byte> msg) {
 	H->hashFinal(c_byte, 0);
 	auto end_hash = std::chrono::high_resolution_clock::now();
 
-	cout << "time hash: " << chrono::duration_cast<chrono::microseconds>(end_hash - start_hash).count() << endl;
 	byte c_byte_arr[c_byte.size()];
 	copy_byte_vector_to_byte_array(c_byte, c_byte_arr, 0);
 	biginteger c = mod(decodeBigInteger(c_byte_arr, c_byte.size()), q);
@@ -145,7 +144,7 @@ int main_schnorr(int argc, char* argv[]) {
 
 	Signature sig = signer->sign(msg);
 
-	cout << "signature verified: " << verifier->verify(msg, sig, y) << endl;
+	cout << "Signature verified: " << verifier->verify(msg, sig, y) << endl;
 	
 	return 0;
 }
