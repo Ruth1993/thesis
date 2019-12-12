@@ -21,7 +21,7 @@ void Party::pad(vector<unsigned char> &input, int bits) {
 }
 
 /*
-*	Setup shared public key for double encryption
+*	Setup shared public key for threshold encryption
 */
 void Party::key_setup(shared_ptr<PublicKey> pk_other) {
 	shared_ptr<GroupElement> h_shared = dlog->exponentiate(((ElGamalPublicKey*) pk_other.get())->getH().get(), ((ElGamalPrivateKey*) sk_own.get())->getX());
@@ -322,8 +322,10 @@ biginteger Party::random_bit() {
 /*
 *	Abort the protocol
 */
-void Party::abort_protocol() {
-	exit(1);
+void Party::check_abort(bool verification) {
+	if (!verification) {
+		exit(1);
+	}
 }
 
 /*
@@ -334,7 +336,7 @@ biginteger Party::random_bitstring(int bits) {
 	biginteger result = getRandomInRange(0, q - 1, get_seeded_prg().get());
 
 	if (bits > 0 && bits < NumberOfBits(q)) {
-		result = getRandomInRange(0, (biginteger) pow(2, bits), get_seeded_prg().get());
+		result = getRandomInRange(0, ((biginteger) pow(2, bits))-1, get_seeded_prg().get());
 	}
 
 	return result;
@@ -382,26 +384,8 @@ vector<byte> Party::compute_n(int u, shared_ptr<AsymmetricCiphertext> k_enc, sha
 }
 
 /*
-*	Compute [[B]] by multipling [[C]] and [[k]] element-wise
-*/
-vector<shared_ptr<AsymmetricCiphertext>> Party::calc_B_enc(vector<shared_ptr<AsymmetricCiphertext>> C_enc2, shared_ptr<AsymmetricCiphertext> K_enc2) {
-	vector<shared_ptr<AsymmetricCiphertext>> B_enc2;
-
-	for (shared_ptr<AsymmetricCiphertext> C_i_enc2 : C_enc2) {
-		auto start = chrono::steady_clock::now();
-		biginteger r = dlog->getOrder() - 2;
-		shared_ptr<AsymmetricCiphertext> B_i_enc2 = elgamal->multiply((ElGamalOnGroupElementCiphertext*)C_i_enc2.get(), (ElGamalOnGroupElementCiphertext*)K_enc2.get(), r);
-		auto end = chrono::steady_clock::now();
-		//cout << "Time elapsed by computing [[C]]*[[k]] in us: " << chrono::duration_cast<chrono::microseconds>(end-start).count() << endl;
-		B_enc2.push_back(B_i_enc2);
-	}
-
-	return B_enc2;
-}
-
-/*
 *	Sigma protocol proof
-*	quality of exponents proof of Step 26
+*	Equality of exponents proof of Step 26
 */
 void Party::zkpk_prove(biginteger x, vector<shared_ptr<GroupElement>> y, vector<shared_ptr<GroupElement>> bases) {
 	biginteger q = dlog->getOrder();
@@ -446,13 +430,19 @@ bool Party::zkpk_verify(int k, vector<shared_ptr<GroupElement>> y, vector<shared
 	send_biginteger(c);
 
 	//Receive response from prover
+	auto start = std::chrono::high_resolution_clock::now();
 	biginteger s = recv_biginteger();
 
 	//Verify
+
 	for (int i = 0; i < bases.size(); i++) {
 		auto left = dlog->multiplyGroupElements(dlog->exponentiate(bases[i].get(), s).get(), dlog->exponentiate(y[i].get(), c).get());
 		result = (result && (*left.get() == *t[i].get()));
 	}
+
+	auto end = std::chrono::high_resolution_clock::now();
+
+	cout << "Time zkpk_verify: " << chrono::duration_cast<chrono::microseconds>(end - start).count() << endl;
 
 	return result;
 }
@@ -504,7 +494,6 @@ bool Party::zkpk_verify_with_com(int m, vector<shared_ptr<GroupElement>> y, vect
 	//Send challenge to prover
 	send_biginteger(c);
 
-
 	//Receive response from prover
 	vector<biginteger> s = recv_vec_biginteger();
 
@@ -517,7 +506,7 @@ bool Party::zkpk_verify_with_com(int m, vector<shared_ptr<GroupElement>> y, vect
 }
 
 /*
-*	Basic Coin Tossing protocol for party 1
+*	Basic Coin Tossing protocol for party 1 (1-bit version)
 */
 int Party::bct_bit_p1() {
   shared_ptr<CmtCommitter> committer = make_shared<CmtPedersenCommitter>(channel, dlog);
@@ -593,7 +582,7 @@ biginteger Party::bct_p1() {
 }
 
 /*
-*	Basic Coin Tossing protocol for party 2
+*	Basic Coin Tossing protocol for party 2 (one-bit version)
 */
 int Party::bct_bit_p2() {
   shared_ptr<CmtReceiver> receiver = make_shared<CmtPedersenReceiver>(channel, dlog);

@@ -27,9 +27,7 @@ struct Signature {
 
 class Signer {
 private:
-	//shared_ptr<OpenSSLDlogZpSafePrime> dlog;
 	shared_ptr<OpenSSLDlogECF2m> dlog;
-	//shared_ptr<OpenSSLDlogECFp> dlog;
 
 	biginteger alpha;
 
@@ -44,7 +42,6 @@ public:
 
 class Verifier {
 private:
-	//shared_ptr<OpenSSLDlogZpSafePrime> dlog;
 	shared_ptr<OpenSSLDlogECF2m> dlog;
 
 public:

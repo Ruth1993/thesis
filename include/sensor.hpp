@@ -42,6 +42,8 @@ public:
 
 	bool verify_permutation2(vector<shared_ptr<AsymmetricCiphertext>> C_enc, vector<shared_ptr<AsymmetricCiphertext>> C_enc_prime);
 
+	vector<shared_ptr<AsymmetricCiphertext>> calc_B_enc(vector<shared_ptr<AsymmetricCiphertext>> C_enc2, shared_ptr<AsymmetricCiphertext> K_enc2);
+
 	bool verify_D1(int soundness, vector<shared_ptr<AsymmetricCiphertext>> B_enc2, vector<shared_ptr<AsymmetricCiphertext>> B_enc);
 
 	vector<shared_ptr<GroupElement>> decrypt_B_enc2(vector<shared_ptr<AsymmetricCiphertext>> B_enc);

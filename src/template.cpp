@@ -17,8 +17,8 @@ using namespace std;
 *   Generate random template with scores between min_s and max_s
 */
 Template::Template(pair<int, int> size, biginteger min_s, biginteger max_s) {
-  k = size.first;
-  two_pow_b = size.second;
+	two_pow_b = size.first;
+	k = size.second;
 
   for(int i=0; i<k; i++) {
     vector<biginteger> vec_col;

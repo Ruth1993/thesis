@@ -7,6 +7,7 @@
 #define PARTY_H
 
 #include <string>
+#include <fstream>
 
 #include "../../libscapi/include/mid_layer/OpenSSLSymmetricEnc.hpp"
 #include "../../libscapi/include/primitives/DlogOpenSSL.hpp"
@@ -31,9 +32,7 @@ protected:
 
   //ElGamal and AES objects
   shared_ptr<OpenSSLCTREncRandomIV> aes;
-  //shared_ptr<OpenSSLDlogZpSafePrime> dlog;
   shared_ptr<OpenSSLDlogECF2m> dlog;
-  //shared_ptr<OpenSSLDlogECFp> dlog;
   shared_ptr<ElGamalOnGroupElementEnc> elgamal;
 
   shared_ptr<PublicKey> pk_own;
@@ -42,11 +41,13 @@ protected:
   shared_ptr<PublicKey> pk_other;
 
   //Protocol parameters
-  const pair<int, int> template_size = make_pair(3,4); //assert sqrt(template_size.second) == integer
-  const int min_s = 0;
-  const int max_s = 10;
-  const biginteger max_S = template_size.first * max_s;
-  const biginteger t = max_S - 10; //threshold
+  const pair<int, int> template_size = make_pair(pow(2,4), 21);
+  const int min_s = 0; //minimum partial similarity score
+  const int max_s = 6; //maximum partial similarity score
+  const float dQ = 2; //step size for score quantization
+  const biginteger max_S = (biginteger) (((float) template_size.second * max_s) * ((float) (1/dQ))); //maximum total score
+  const biginteger t = max_S/3*2; //threshold set to 2/3 of max_S
+  const int ch = 80; //soundness for zero-knowledge protocols (challenge length)
 
 public:
   void pad(vector<unsigned char> &input, int bytes);
@@ -101,15 +102,13 @@ public:
 
   biginteger random_bit();
 
-  void abort_protocol();
+  void check_abort(bool verification);
 
   biginteger random_bitstring(int bits);
 
   vector<byte> compute_m(int u, shared_ptr<Template_enc> T_enc);
 
   vector<byte> compute_n(int u, shared_ptr<AsymmetricCiphertext> k_enc, shared_ptr<SymmetricCiphertext> aes_k);
-
-  vector<shared_ptr<AsymmetricCiphertext>> calc_B_enc(vector<shared_ptr<AsymmetricCiphertext>> C_enc2, shared_ptr<AsymmetricCiphertext> K_enc2);
 
   void zkpk_prove(biginteger x, vector<shared_ptr<GroupElement>> y, vector<shared_ptr<GroupElement>> bases);
 

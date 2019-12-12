@@ -8,14 +8,7 @@
 using namespace std;
 
 Signer::Signer() {
-	ConfigFile cf("dlog_params.txt");
-	string q_string = cf.Value("", "q");
-	string p_string = cf.Value("", "p");
-	string g_string = cf.Value("", "g");
-
-	//dlog = make_shared<OpenSSLDlogZpSafePrime>(q_string, g_string, p_string);
 	dlog = make_shared<OpenSSLDlogECF2m>("../../libscapi/include/configFiles/NISTEC.txt", "K-233");
-	//dlog = make_shared<OpenSSLDlogECFp>("B-163");
 
 	biginteger q = dlog->getOrder();
 	auto g = dlog->getGenerator();
@@ -59,12 +52,6 @@ Signature Signer::sign(vector<byte> msg) {
 }
 
 Verifier::Verifier() {
-	ConfigFile cf("dlog_params.txt");
-	string q_string = cf.Value("", "q");
-	string p_string = cf.Value("", "p");
-	string g_string = cf.Value("", "g");
-
-	//dlog = make_shared<OpenSSLDlogZpSafePrime>(q_string, g_string, p_string);
 	dlog = make_shared<OpenSSLDlogECF2m>("../../libscapi/include/configFiles/NISTEC.txt", "K-233");
 
 	H = make_shared<OpenSSLSHA512>();
