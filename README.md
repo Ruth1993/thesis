@@ -1,29 +1,26 @@
 # Master Thesis
-This is the code for my master thesis. It's still work in progress, so when you try to compile and run it, it may give errors or it might not work the way you expect. So in that case, just look at the code instead of running it or come back later.
 
-Install instructions:
+Installation Instructions:
 - git clone https://github.com/Ruth1993/thesis.git
-- Install libscapi as on: https://github.com/cryptobiu/libscapi/tree/dev. If it does not compile, please try https://github.com/Ruth1993/libscapi
-- To check if the installation was successful, build and run the tests as on: https://biulibscapi.readthedocs.io/en/latest/install.html
+- Install libscapi as on: https://github.com/cryptobiu/libscapi/tree/dev. If it does not compile, please try https://github.com/Ruth1993/libscapi.
+- To check if the installation was successful, build and run the tests as on: https://biulibscapi.readthedocs.io/en/latest/install.html.
 
-For the installation of the malicious key release protocol, please carry out the additional steps:
-- cd ~/libscapi/include/primitives/Dlog.hpp
-- Change line 811 and/or line 813 to the correct file path or copy NISTEC.txt to the specified location. In case folders thesis and libscapi are located in the same folder, change line 811 or 813 (depending on the OS you're using) to: const string NISTEC_PROPERTIES_FILE = "../../libscapi/include/configFiles/NISTEC.txt";
-- cd ../..
+For the installation of the partially malicious key release protocol, please carry out the additional steps:
+- cd ~/libscapi/include/primitives/Dlog.hpp 
+- Change line 811 and/or line 813 (depending on the OS) to the correct file path or copy NISTEC.txt to the specified location. In case folders thesis and libscapi are located in the same folder, change line 811 or 813 to: const string NISTEC\_PROPERTIES\_FILE = "../../libscapi/include/configFiles/NISTEC.txt"
+- cd ../.. 
 - make
-
-
-The code has been tested and found working on Ubuntu 16.04 with OpenSSL 1.0.2g.
 
 Compile:
 - ~/thesis
 - make
 
 Run:
-- Semi-honest protocol:
+Open 2 terminals and run the protocols as follows:
+- Semi-honest Key Release Protocol:
 	- ./server or ./server sh
 	- ./sensor or ./sensor sh
-- Malicious protocol:
+- Partially Malicious Key Release Protocol:
 	- ./server mal
 	- ./sensor mal
 
