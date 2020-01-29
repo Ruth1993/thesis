@@ -41,7 +41,7 @@ protected:
   shared_ptr<PublicKey> pk_other;
 
   //Protocol parameters
-  const pair<int, int> template_size = make_pair(pow(2,4), 21);
+  const pair<int, int> template_size = make_pair(pow(2,3), 12);
   const int min_s = 0; //minimum partial similarity score
   const int max_s = 6; //maximum partial similarity score
   const float dQ = 2; //step size for score quantization
