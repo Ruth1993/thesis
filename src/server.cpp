@@ -521,7 +521,7 @@ pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> Server::
 }
 
 /*
-*	Compute [[B]] by multipling [[C]] and [[k]] element-wise
+*	Compute [[B]] by multiplying [[C]] and [[k]] element-wise
 */
 vector<shared_ptr<AsymmetricCiphertext>> Server::calc_B_enc(vector<shared_ptr<AsymmetricCiphertext>> C_enc2, shared_ptr<AsymmetricCiphertext> K_enc2) {
 	vector<shared_ptr<AsymmetricCiphertext>> B_enc2;
@@ -529,6 +529,21 @@ vector<shared_ptr<AsymmetricCiphertext>> Server::calc_B_enc(vector<shared_ptr<As
 	for (shared_ptr<AsymmetricCiphertext> C_i_enc2 : C_enc2) {
 		biginteger r = bct_p1();
 		shared_ptr<AsymmetricCiphertext> B_i_enc2 = elgamal->multiply((ElGamalOnGroupElementCiphertext*)C_i_enc2.get(), (ElGamalOnGroupElementCiphertext*)K_enc2.get(), r);
+
+		B_enc2.push_back(B_i_enc2);
+	}
+
+	return B_enc2;
+}
+
+/*
+*	Compute [[B]] by multiplying [[C]] and [[k]] element-wise
+*/
+vector<shared_ptr<AsymmetricCiphertext>> Server::calc_B_enc_sh(vector<shared_ptr<AsymmetricCiphertext>> C_enc2, shared_ptr<AsymmetricCiphertext> K_enc2) {
+	vector<shared_ptr<AsymmetricCiphertext>> B_enc2;
+
+	for (shared_ptr<AsymmetricCiphertext> C_i_enc2 : C_enc2) {
+		shared_ptr<AsymmetricCiphertext> B_i_enc2 = elgamal->multiply((ElGamalOnGroupElementCiphertext*)C_i_enc2.get(), (ElGamalOnGroupElementCiphertext*)K_enc2.get());
 
 		B_enc2.push_back(B_i_enc2);
 	}
@@ -752,7 +767,7 @@ int Server::main_sh() {
 		pair<shared_ptr<AsymmetricCiphertext>, shared_ptr<SymmetricCiphertext>> key_pair = fetch_key_pair(u);
 
 		//Multiply elements in [[C]] with [[k]]
-		vector<shared_ptr<AsymmetricCiphertext>> B_enc = calc_B_enc(get<0>(C_enc_prime), key_pair.first);
+		vector<shared_ptr<AsymmetricCiphertext>> B_enc = calc_B_enc_sh(get<0>(C_enc_prime), key_pair.first);
 
 		//Perform partial decryption function D1
 		auto start_D1 = std::chrono::high_resolution_clock::now();
@@ -766,10 +781,9 @@ int Server::main_sh() {
 		send_aes_msg(key_pair.second);
 
 		//Print elapsed time
+		cout << endl << "Elapsed time:" << endl;
 		auto time_compare = chrono::duration_cast<chrono::microseconds>(end_compare - start_compare).count();
 		auto time_D1 = chrono::duration_cast<chrono::microseconds>(end_D1 - start_D1).count();
-
-		cout << endl << endl;
 
 		cout << "Comparison: " << time_compare << endl;
 		cout << "D1: " << time_D1 << endl;

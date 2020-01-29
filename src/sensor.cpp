@@ -771,9 +771,8 @@ int Sensor::main_sh() {
 		cout << "Key: " << ((OpenSSLZpSafePrimeElement*)key.get())->getElementValue() << endl;
 
 		//Print elapsed time
+		cout << endl << "Elapsed time: " << endl;
 		auto time_D2 = chrono::duration_cast<chrono::microseconds>(end_D2 - start_D2).count();
-
-		cout << endl << endl;
 
 		cout << "Decryption of [B]: " << time_D2 << endl;
 
