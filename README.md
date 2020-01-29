@@ -25,7 +25,6 @@ Open 2 terminals and run the protocols as follows:
 	- ./sensor mal
 
 Interpretation of the output:
-- First of all, please note that the code of the malicious protocol is work in progress, so it will probably give you weird output.
-- For interpretation of the code, send me a message and I will send you my master thesis paper (WIP), which explains the protocol that I implemented.
+- For interpretation of the code, send me a message and I will send you my master thesis paper, which explains the protocol that I implemented.
 - If the verification procedure was successful, a key will be printed. In case the verification was unsuccessful, the key will be 1.
 - In the enrollment procedure, a template T_u belonging to identity u will be created and in the verification procedure, a probe vector vec_p will be created, which are printed, so you can manually check if the selected scores add up to exceeding the threshold. For each column j in T_u, vec_p[j] selects the row containing the partial similarity score.
