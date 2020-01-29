@@ -232,8 +232,6 @@ tuple<vector<shared_ptr<AsymmetricCiphertext>>, vector<shared_ptr<CmtCCommitment
 
 	biginteger j = max_S - t;
 
-	cout << "j: " << j << endl;
-
 	for (int i = 0; i <= j; i++) {
 		//perform basic coin tossing protocol to jointly compute randomness x used for the encryption of g^(S-t-i)
 		biginteger x1 = bct_p2();
